@@ -15,6 +15,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from .config import Settings, get_settings
+from .docscan import pdf
 from .docscan.pipeline import ScanThresholds, analyze
 from .emrtd import chip_auth
 from .emrtd.csca_store import CscaStore
@@ -236,7 +237,7 @@ def emrtd_issue(req: EmrtdIssueRequest) -> dict:
 
 @app.post("/api/v1/document/issue")
 async def document_issue(
-    front: UploadFile = File(..., description="photo of the document data page / card front"),
+    front: UploadFile = File(..., description="photo or PDF of the data page / card front (a 2-page PDF may hold front+back)"),
     back: UploadFile | None = File(None, description="photo of the card back (TD1 ID cards carry the MRZ there)"),
     device_key: str = Form(...),
     device_ocr_text: str = Form("", description="text recognised on-device (ML Kit), all sides"),
@@ -249,8 +250,21 @@ async def document_issue(
     s = state.settings
     front_bytes = await front.read()
     back_bytes = await back.read() if back is not None else None
-    if len(front_bytes) > 15_000_000 or (back_bytes and len(back_bytes) > 15_000_000):
-        raise HTTPException(413, "image too large")
+    if len(front_bytes) > 25_000_000 or (back_bytes and len(back_bytes) > 25_000_000):
+        raise HTTPException(413, "file too large")
+    # PDF scans: page 1 = front, page 2 = back (ID cards); a one-page PDF may hold both sides
+    try:
+        if pdf.is_pdf(front_bytes):
+            pages = pdf.render_pages(front_bytes, max_pages=1 if back_bytes else 2)
+            front_bytes = pages[0]
+            if back_bytes is None and len(pages) > 1:
+                back_bytes = pages[1]
+        if back_bytes and pdf.is_pdf(back_bytes):
+            back_bytes = pdf.render_pages(back_bytes, max_pages=1)[0]
+    except ValueError as e:
+        raise HTTPException(400, f"PDF upload: {e}") from e
+    if front.content_type == "application/pdf" or (back is not None and back.content_type == "application/pdf"):
+        image_source = "upload"
     try:
         result = analyze(front_bytes, back_bytes or None, device_ocr_text, document_kind,
                          ScanThresholds(min_score=s.scan_min_score, allow_specimen=s.scan_allow_specimen),

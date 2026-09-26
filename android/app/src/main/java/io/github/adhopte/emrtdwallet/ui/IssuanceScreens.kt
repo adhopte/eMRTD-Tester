@@ -8,8 +8,10 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.runtime.rememberCoroutineScope
 import io.github.adhopte.emrtdwallet.docscan.DocumentOcr
+import io.github.adhopte.emrtdwallet.docscan.DocumentPdf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -226,7 +228,9 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
     val capture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).build() }
     val needBack = kind == "id_card"
     val capturingBack = front != null && needBack && back == null
-    val ready = front != null && (!needBack || back != null)
+    // A one-page PDF of an ID card usually holds both sides scanned together
+    var combinedSides by remember { mutableStateOf(false) }
+    val ready = front != null && (!needBack || back != null || combinedSides)
     val scope = rememberCoroutineScope()
     var loading by remember { mutableStateOf(false) }
     var uploaded by remember { mutableStateOf(false) }
@@ -251,13 +255,32 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
         }
     }
 
+    val pdfPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        loading = true
+        scope.launch {
+            try {
+                // Remaining sides to fill: both for a fresh start, one if the front is already set
+                val wanted = if (front == null) (if (needBack) 2 else 1) else 1
+                val pages = withContext(Dispatchers.IO) { DocumentPdf.renderPages(context, uri, wanted) }
+                pages.forEach(::accept)
+                uploaded = true
+                if (needBack && front != null && back == null && pages.size == 1) combinedSides = true
+            } catch (e: Exception) {
+                error = e.message ?: "Could not read the selected PDF"
+            } finally {
+                loading = false
+            }
+        }
+    }
+
     LaunchedEffect(state) { if (state is IssuanceState.Finished) onDone() }
 
     Scaffold(topBar = { SimpleTopBar("Scan document", onBack) }) { padding ->
         Column(Modifier.padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(kind == "passport", { kind = "passport"; back = null }, label = { Text("Passport") })
+                FilterChip(kind == "passport", { kind = "passport"; back = null; combinedSides = false }, label = { Text("Passport") })
                 FilterChip(kind == "id_card", { kind = "id_card" }, label = { Text("ID card") })
             }
             when (val s = state) {
@@ -306,6 +329,8 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
                             Text(if (capturingBack) " Capture back" else " Capture", maxLines = 1)
                         }
                     }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     OutlinedButton(
                         onClick = {
                             error = null
@@ -314,8 +339,19 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
                         modifier = Modifier.weight(1f),
                     ) {
                         Icon(Icons.Filled.Image, null)
-                        Text(if (capturingBack) " Upload back" else " Upload image", maxLines = 1)
+                        Text(if (capturingBack) " Image (back)" else " Upload image", maxLines = 1)
                     }
+                    OutlinedButton(
+                        onClick = { error = null; pdfPicker.launch(arrayOf("application/pdf")) },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(Icons.Filled.PictureAsPdf, null)
+                        Text(if (capturingBack) " PDF (back)" else " Upload PDF", maxLines = 1)
+                    }
+                }
+                if (needBack && !capturingBack) {
+                    Text("ID card PDF: page 1 = front, page 2 = back (a single page with both sides also works).",
+                        style = MaterialTheme.typography.bodySmall)
                 }
                 if (loading) CircularProgressIndicator()
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -323,10 +359,11 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 front?.let { Thumb(it, "Front") }
                 back?.let { Thumb(it, "Back") }
+                if (combinedSides) Text("Front + back on one page", style = MaterialTheme.typography.labelSmall)
             }
             if (front != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { front = null; back = null; uploaded = false; error = null; vm.resetIssuance() }) { Text("Start over") }
+                    OutlinedButton(onClick = { front = null; back = null; uploaded = false; combinedSides = false; error = null; vm.resetIssuance() }) { Text("Start over") }
                     Button(onClick = { vm.submitImages(front!!, back, kind, uploaded) }, enabled = ready) { Text("Verify & issue PID") }
                 }
             }

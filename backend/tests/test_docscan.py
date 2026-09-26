@@ -92,3 +92,43 @@ def test_uploaded_image_is_flagged_but_accepted(client, fake_face):
     assert checks(res)["document_authenticity_heuristics.capture_source"] == "warn"
     evidence = res["credential"]["claims"]["org.emrtd-tester.evidence.1"]
     assert evidence["verification_checks"]["image_source"] == "upload"
+
+
+def _as_pdf(*jpegs: bytes) -> bytes:
+    import io
+
+    from PIL import Image
+
+    pages = [Image.open(io.BytesIO(j)).convert("RGB") for j in jpegs]
+    buf = io.BytesIO()
+    pages[0].save(buf, format="PDF", resolution=300, save_all=True, append_images=pages[1:])
+    return buf.getvalue()
+
+
+def _post_pdf(client, pdf_bytes, text):
+    k = ec.generate_private_key(ec.SECP256R1())
+    dk = base64.b64encode(cbor2.dumps(ec_to_cose_key(k.public_key()))).decode()
+    return client.post("/api/v1/document/issue",
+                       files={"front": ("scan.pdf", pdf_bytes, "application/pdf")},
+                       data={"device_key": dk, "device_ocr_text": text, "document_kind": "id_card"}).json()
+
+
+def test_pdf_upload_is_rendered_and_accepted(client, fake_face):
+    res = _post_pdf(client, _as_pdf(synthetic_card(MRZ, VIZ)), "\n".join(VIZ) + "\n" + MRZ)
+    assert res["decision"] == "accepted", (res["reasons"], checks(res))
+    assert checks(res)["document_authenticity_heuristics.capture_source"] == "warn"
+
+
+def test_two_page_pdf_gives_front_and_back(client, fake_face):
+    card = synthetic_card(MRZ, VIZ)
+    res = _post_pdf(client, _as_pdf(card, card), "\n".join(VIZ) + "\n" + MRZ)
+    assert "image_quality.back_resolution" in checks(res)
+
+
+def test_invalid_pdf_rejected(client):
+    res = client.post("/api/v1/document/issue",
+                      files={"front": ("scan.pdf", b"%PDF-1.7 garbage", "application/pdf")},
+                      data={"device_key": base64.b64encode(cbor2.dumps(ec_to_cose_key(
+                          ec.generate_private_key(ec.SECP256R1()).public_key()))).decode()})
+    assert res.status_code == 400
+    assert "PDF" in res.json()["detail"]

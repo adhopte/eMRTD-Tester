@@ -10,3 +10,4 @@ pillow>=10.3
 numpy>=1.26,<3
 opencv-python-headless>=4.9,<5
 pytesseract>=0.3.10
+pypdfium2>=4.30
