@@ -38,6 +38,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setCan(can: String) { _accessKey.value = ChipAccessKey.Can(can) }
     fun resetIssuance() { _issuance.value = IssuanceState.Idle }
 
+    /** Called when the user starts adding a PID, so a sleeping backend is awake before the chip read. */
+    fun warmUpIssuer() {
+        viewModelScope.launch { repository.api.warmUp() }
+    }
+
     fun onPassportTag(tag: Tag) {
         val key = _accessKey.value ?: return
         if (_issuance.value is IssuanceState.Working) return

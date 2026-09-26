@@ -99,6 +99,28 @@ The test IACA and DS keys are generated on first start in `PID_PKI_DIR` (default
 | `POST /api/v1/mdoc/verify` | self-check of an `issuer_signed` blob against the issuer IACA |
 | `GET /pki/iaca.pem` | trust anchor to import into verifiers |
 
+## Deploying the backend on Render
+
+The repo includes a Render Blueprint (`render.yaml`) that builds `backend/Dockerfile`. You need Docker rather than Render's native Python runtime, because the image installs Tesseract. The container listens on Render's `$PORT`.
+
+1. **Generate the issuer PKI once, locally.** Render's filesystem is wiped on every deploy or restart. Without a persistent PKI, each restart would create a new IACA, and verifiers would reject every PID issued before it.
+   ```bash
+   cd backend && pip install -r requirements.txt
+   python scripts/gen_pki.py --base-url https://emrtd-pid-issuer.onrender.com --out pki-out
+   ```
+   Use your real service URL; the IACA and DS certificates embed it. Keep `pki-out/*.key` private and never commit them.
+2. **Create the service.** In the Render dashboard choose **New → Blueprint**, connect this GitHub repo and apply `render.yaml`. When prompted, set `PID_PUBLIC_BASE_URL` to the service URL (e.g. `https://emrtd-pid-issuer.onrender.com`).
+   To create it by hand instead: **New → Web Service → Docker**, set root directory `backend`, health check path `/health`, and the same environment variables as in `render.yaml`.
+3. **Upload the PKI as Secret Files.** Open the service, go to **Environment → Secret Files**, and add four files named `iaca.key`, `iaca.pem`, `ds.key` and `ds.pem` with the contents from `pki-out/`. Render mounts them read-only at `/etc/secrets`, and `PID_PKI_DIR=/etc/secrets` points the app there. Redeploy.
+4. **Check it.** `https://<service>.onrender.com/health` should return `{"status":"ok",...}`. `/pki/iaca.pem` must return the same certificate as `pki-out/iaca.pem`. If the logs say "could not persist the generated PKI", the secret files are missing.
+5. **Point the app at it.** Either open **Settings** in the app and enter the service URL, or build the app with the URL as default: `./gradlew assembleDebug -PissuerUrl=https://<service>.onrender.com`.
+
+Notes:
+- **Free plan:** the service sleeps after about 15 minutes idle and takes up to a minute to wake. The app pings `/health` when you tap *Add PID*, but a cold start can still interrupt an NFC read. If that happens, hold the document to the phone again. The `starter` plan avoids sleeping.
+- **Instances:** run a single instance. Issuance sessions (AA/CA challenges) are kept in memory, so scaling out needs a shared session store.
+- **CSCA certificates:** they're public, so commit them to `backend/data/csca/` and they're baked into the image. Then set `PID_REQUIRE_CSCA_TRUST=true`.
+- **DS rotation:** the Document Signer certificate is valid for about 15 months. Before it expires, regenerate with `gen_pki.py` and replace the secret files. Keep the old `iaca.*` files in the output directory: the script reuses an existing IACA and only renews the DS.
+
 ## Building the Android app
 
 Requirements: JDK 17+ and Android SDK 36. The minimum device version is Android 10 (API 29), and the phone needs NFC for the chip path.

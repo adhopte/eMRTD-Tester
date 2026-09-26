@@ -131,11 +131,16 @@ def load_or_create(pki_dir: str | pathlib.Path, country: str, organization: str,
         if pki.ds_cert.not_valid_after_utc > dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=30):
             return pki
         log.warning("Document Signer certificate close to expiry; regenerating test PKI")
-    d.mkdir(parents=True, exist_ok=True)
     pki = generate(country, organization, public_base_url)
-    _write_key(files["iaca.key"], pki.iaca_key)
-    files["iaca.pem"].write_bytes(pki.iaca_pem())
-    _write_key(files["ds.key"], pki.ds_key)
-    files["ds.pem"].write_bytes(pki.ds_pem())
-    log.info("generated new test IACA + Document Signer in %s", d)
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+        _write_key(files["iaca.key"], pki.iaca_key)
+        files["iaca.pem"].write_bytes(pki.iaca_pem())
+        _write_key(files["ds.key"], pki.ds_key)
+        files["ds.pem"].write_bytes(pki.ds_pem())
+        log.info("generated new test IACA + Document Signer in %s", d)
+    except OSError as e:
+        # e.g. a read-only secrets mount without the PKI files yet
+        log.warning("could not persist the generated PKI to %s (%s); it will change on restart, "
+                    "which invalidates previously issued PIDs", d, e)
     return pki

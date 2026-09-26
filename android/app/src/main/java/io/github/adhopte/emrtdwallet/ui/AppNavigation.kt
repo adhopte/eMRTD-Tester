@@ -38,7 +38,7 @@ fun AppNavigation(remoteRequest: Uri?, onRemoteRequestConsumed: () -> Unit) {
         composable(Routes.HOME) {
             HomeScreen(
                 vm = vm,
-                onAdd = { nav.navigate(Routes.ADD) },
+                onAdd = { vm.warmUpIssuer(); nav.navigate(Routes.ADD) },
                 onOpen = { nav.navigate(Routes.document(it)) },
                 onPresent = {
                     vm.repository.presentation.startProximity()

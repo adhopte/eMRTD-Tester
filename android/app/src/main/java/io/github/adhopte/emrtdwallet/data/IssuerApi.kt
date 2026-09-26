@@ -90,6 +90,13 @@ class IssuerApi(private val baseUrl: () -> String) {
         .build()
     private val jsonType = "application/json".toMediaType()
 
+    /** Wake the backend (hosted free tiers sleep when idle) before a time-critical NFC read. */
+    suspend fun warmUp(): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            client.newCall(Request.Builder().url(baseUrl() + "/health").build()).execute().use { it.isSuccessful }
+        }.getOrDefault(false)
+    }
+
     suspend fun challenge(dg14: ByteArray?): ChallengeResponse =
         post("/api/v1/emrtd/challenge", json.encodeToString(ChallengeRequest.serializer(), ChallengeRequest(dg14?.b64())))
             .let { json.decodeFromString(ChallengeResponse.serializer(), it) }

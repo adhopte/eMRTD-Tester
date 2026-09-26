@@ -16,8 +16,10 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         // Default issuer backend; can be changed at runtime in Settings.
-        // 10.0.2.2 is the host machine when running in the Android emulator.
-        buildConfigField("String", "DEFAULT_ISSUER_URL", "\"http://10.0.2.2:8000\"")
+        // Override at build time: ./gradlew assembleDebug -PissuerUrl=https://my-issuer.onrender.com
+        // (http://10.0.2.2:8000 is the host machine when running in the Android emulator.)
+        val issuerUrl = (project.findProperty("issuerUrl") as String?) ?: "http://10.0.2.2:8000"
+        buildConfigField("String", "DEFAULT_ISSUER_URL", "\"$issuerUrl\"")
         // NFC phones are arm64; x86_64 keeps the emulator working
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }

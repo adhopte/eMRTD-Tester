@@ -1,0 +1,24 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: emrtd-pid-issuer
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter            # "free" works too, but sleeps after 15 min idle (see README)
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # Must equal the service's public URL; it is embedded in the IACA/DS certificates
+      - key: PID_PUBLIC_BASE_URL
+        sync: false
+      # Upload iaca.key, iaca.pem, ds.key, ds.pem as Secret Files (see scripts/gen_pki.py)
+      - key: PID_PKI_DIR
+        value: /etc/secrets
+      - key: PID_ISSUER_COUNTRY
+        value: EU
+      - key: PID_REQUIRE_CSCA_TRUST
+        value: "false"
+      - key: PID_REQUIRE_CHIP_GENUINENESS
+        value: "true"

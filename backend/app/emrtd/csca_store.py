@@ -15,6 +15,7 @@ from asn1crypto import cms, core, pem, x509
 log = logging.getLogger(__name__)
 
 CSCA_MASTER_LIST_OID = "2.23.136.1.1.2"
+_CERT_SUFFIXES = {".pem", ".crt", ".cer", ".der", ".ml", ".p7b", ".p7c"}
 
 
 class _CertSet(core.SetOf):
@@ -48,7 +49,7 @@ class CscaStore:
         if not p.exists():
             return store
         for f in sorted(p.rglob("*")):
-            if f.is_file():
+            if f.is_file() and f.suffix.lower() in _CERT_SUFFIXES:
                 try:
                     store.add_file(f)
                 except Exception as e:  # noqa: BLE001 - skip unparsable files, keep loading
