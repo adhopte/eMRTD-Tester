@@ -10,6 +10,8 @@ import numpy as np
 log = logging.getLogger(__name__)
 
 MRZ_WHITELIST = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<"
+# Bound each Tesseract call so a slow/low-CPU host never stalls a request indefinitely
+OCR_TIMEOUT_S = 20
 
 
 def available() -> bool:
@@ -30,7 +32,7 @@ def ocr_text(img: np.ndarray) -> str:
     import pytesseract
 
     try:
-        return pytesseract.image_to_string(_prep(img), config="--psm 3")
+        return pytesseract.image_to_string(_prep(img), config="--psm 3", timeout=OCR_TIMEOUT_S)
     except Exception as e:  # noqa: BLE001
         log.warning("tesseract failed: %s", e)
         return ""
@@ -46,7 +48,7 @@ def ocr_mrz(img: np.ndarray) -> str:
     region = img[int(h * 0.6):, :]
     try:
         return pytesseract.image_to_string(
-            _prep(region), config=f"--psm 6 -c tessedit_char_whitelist={MRZ_WHITELIST}")
+            _prep(region), config=f"--psm 6 -c tessedit_char_whitelist={MRZ_WHITELIST}", timeout=OCR_TIMEOUT_S)
     except Exception as e:  # noqa: BLE001
         log.warning("tesseract MRZ OCR failed: %s", e)
         return ""

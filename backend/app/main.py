@@ -6,12 +6,14 @@ import binascii
 import datetime as dt
 import hashlib
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Any
 
 import cbor2
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 from .config import Settings, get_settings
@@ -129,7 +131,9 @@ def issue_pid(ev: IdentityEvidence, device_key: dict) -> dict:
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "csca_certificates": len(state.csca), "issuer_country": state.pki.country}
+    return {"status": "ok", "csca_certificates": len(state.csca), "issuer_country": state.pki.country,
+            # set by Render for each deploy; lets clients see which build is live
+            "version": os.environ.get("RENDER_GIT_COMMIT", "local")[:7]}
 
 
 @app.get("/pki/iaca.pem")
@@ -266,9 +270,12 @@ async def document_issue(
     if front.content_type == "application/pdf" or (back is not None and back.content_type == "application/pdf"):
         image_source = "upload"
     try:
-        result = analyze(front_bytes, back_bytes or None, device_ocr_text, document_kind,
-                         ScanThresholds(min_score=s.scan_min_score, allow_specimen=s.scan_allow_specimen),
-                         image_source=image_source)
+        # CPU-heavy: run in a worker thread so the event loop keeps answering health checks
+        # (a blocked loop makes the host restart the service mid-request -> HTTP 502)
+        result = await run_in_threadpool(
+            analyze, front_bytes, back_bytes or None, device_ocr_text, document_kind,
+            ScanThresholds(min_score=s.scan_min_score, allow_specimen=s.scan_allow_specimen),
+            image_source=image_source)
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
     body: dict[str, Any] = {

@@ -155,11 +155,17 @@ def analyze(front: bytes, back: bytes | None, device_ocr_text: str, document_kin
         weights.append((3.0, provider.verify(front, back, authenticity)))
 
     # --- OCR / MRZ ---------------------------------------------------------
+    # Server-side Tesseract is slow on small instances; only use it when the phone's OCR text
+    # (ML Kit) does not already contain a check-digit-valid MRZ.
     server_text = ""
     server_mrz_text = ""
-    for side in images:
-        server_text += "\n" + ocr.ocr_text(geometry[side].warped)
-        server_mrz_text += "\n" + ocr.ocr_mrz(geometry[side].warped)
+    device_mrz = mrz_mod.find_in_text(device_ocr_text or "")
+    if device_mrz is None or not device_mrz.valid:
+        for side in images:
+            server_mrz_text += "\n" + ocr.ocr_mrz(geometry[side].warped)
+        if not (device_ocr_text or "").strip():
+            for side in images:
+                server_text += "\n" + ocr.ocr_text(geometry[side].warped)
     all_text = "\n".join([device_ocr_text or "", server_mrz_text, server_text])
     mrz = mrz_mod.find_in_text(all_text)
     if mrz is None:
