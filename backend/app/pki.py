@@ -75,7 +75,7 @@ def generate(country: str, organization: str, public_base_url: str) -> IssuerPki
     ian = x509.IssuerAlternativeName([x509.UniformResourceIdentifier(base)])
 
     iaca_key = ec.generate_private_key(ec.SECP256R1())
-    iaca_name = _name(country, organization, f"{organization} IACA (TEST)")
+    iaca_name = _name(country, organization, f"{organization} Issuer IACA (TEST)")
     iaca_cert = (
         x509.CertificateBuilder()
         .subject_name(iaca_name)

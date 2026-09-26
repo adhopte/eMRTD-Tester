@@ -3,6 +3,7 @@ package io.github.adhopte.emrtdwallet.ui
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -18,6 +19,7 @@ object Routes {
     const val DOCUMENT = "document/{id}"
     const val PRESENT = "present"
     const val SETTINGS = "settings"
+    const val TUTORIAL = "tutorial"
     fun document(id: String) = "document/${Uri.encode(id)}"
 }
 
@@ -34,7 +36,19 @@ fun AppNavigation(remoteRequest: Uri?, onRemoteRequestConsumed: () -> Unit) {
         }
     }
 
-    NavHost(navController = nav, startDestination = Routes.HOME) {
+    val start = remember { if (vm.settings.tutorialSeen) Routes.HOME else Routes.TUTORIAL }
+    NavHost(navController = nav, startDestination = start) {
+        composable(Routes.TUTORIAL) {
+            TutorialScreen(onFinish = {
+                vm.settings.tutorialSeen = true
+                if (nav.previousBackStackEntry != null) {
+                    nav.popBackStack() // opened from Help: return to the wallet
+                } else {
+                    // first launch: the tutorial is the start destination, replace it with home
+                    nav.navigate(Routes.HOME) { popUpTo(Routes.TUTORIAL) { inclusive = true } }
+                }
+            })
+        }
         composable(Routes.HOME) {
             HomeScreen(
                 vm = vm,
@@ -45,6 +59,7 @@ fun AppNavigation(remoteRequest: Uri?, onRemoteRequestConsumed: () -> Unit) {
                     nav.navigate(Routes.PRESENT)
                 },
                 onSettings = { nav.navigate(Routes.SETTINGS) },
+                onHelp = { nav.navigate(Routes.TUTORIAL) },
             )
         }
         composable(Routes.ADD) {

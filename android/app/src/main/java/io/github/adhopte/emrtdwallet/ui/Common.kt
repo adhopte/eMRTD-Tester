@@ -47,15 +47,60 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.adhopte.emrtdwallet.data.ReportSection
 
-private val EuBlue = Color(0xFF003399)
-private val EuYellow = Color(0xFFFFCC00)
+/** IN Groupe brand palette (from the CSS custom properties and logo on ingroupe.com). */
+object InGroupe {
+    val Blue = Color(0xFF002F87)        // logo blue
+    val Navy = Color(0xFF192C70)        // --brand-blue
+    val MediumBlue = Color(0xFF0D3E96)  // --brand-medium-blue
+    val SkyBlue = Color(0xFF43B2ED)     // accent
+    val Red = Color(0xFFEA0029)         // logo red
+    val DarkRed = Color(0xFF9C2539)     // --brand-red
+    val Grey = Color(0xFFAEBBCE)        // --brand-grey
+    val LightGrey = Color(0xFFECEFF3)   // --brand-grey-2
+    val Surface = Color(0xFFF7F9FB)     // --brand-light-grey
+    val CardGradient = listOf(Navy, MediumBlue)
+}
 
 @Composable
 fun WalletTheme(content: @Composable () -> Unit) {
     val scheme = if (isSystemInDarkTheme()) {
-        darkColorScheme(primary = Color(0xFF8FA8FF), secondary = EuYellow)
+        darkColorScheme(
+            primary = Color(0xFF9DB8FF),
+            onPrimary = Color(0xFF00205E),
+            primaryContainer = InGroupe.MediumBlue,
+            onPrimaryContainer = Color.White,
+            secondary = InGroupe.SkyBlue,
+            onSecondary = Color(0xFF00344F),
+            tertiary = Color(0xFFFF8A9A),
+            error = Color(0xFFFF8A9A),
+            background = Color(0xFF0B1330),
+            surface = Color(0xFF0B1330),
+            surfaceVariant = Color(0xFF1E2A55),
+            surfaceContainer = Color(0xFF141E42),
+            surfaceContainerHigh = Color(0xFF1B2650),
+        )
     } else {
-        lightColorScheme(primary = EuBlue, secondary = EuYellow)
+        lightColorScheme(
+            primary = InGroupe.Blue,
+            onPrimary = Color.White,
+            primaryContainer = Color(0xFFDDE6F7),
+            onPrimaryContainer = InGroupe.Navy,
+            secondary = InGroupe.SkyBlue,
+            onSecondary = Color.White,
+            secondaryContainer = Color(0xFFDCF1FC),
+            onSecondaryContainer = InGroupe.Navy,
+            tertiary = InGroupe.Red,
+            error = InGroupe.Red,
+            background = InGroupe.Surface,
+            onBackground = InGroupe.Navy,
+            surface = InGroupe.Surface,
+            onSurface = Color(0xFF111A3A),
+            surfaceVariant = InGroupe.LightGrey,
+            outline = InGroupe.Grey,
+            surfaceContainer = Color.White,
+            surfaceContainerLow = Color.White,
+            surfaceContainerHigh = Color.White,
+        )
     }
     MaterialTheme(colorScheme = scheme, content = content)
 }
@@ -113,7 +158,7 @@ fun StatusIcon(status: String) {
     val (icon, tint) = when (status) {
         "pass" -> Icons.Filled.CheckCircle to Color(0xFF2E7D32)
         "warn" -> Icons.Filled.Warning to Color(0xFFF9A825)
-        "fail" -> Icons.Filled.Error to Color(0xFFC62828)
+        "fail" -> Icons.Filled.Error to InGroupe.Red
         else -> Icons.Filled.RemoveCircleOutline to Color.Gray
     }
     Icon(icon, contentDescription = status, tint = tint, modifier = Modifier.size(20.dp))

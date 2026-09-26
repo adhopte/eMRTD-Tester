@@ -2,6 +2,16 @@ package io.github.adhopte.emrtdwallet.ui
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import io.github.adhopte.emrtdwallet.R
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,6 +73,23 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+fun BrandTopBar(actions: @Composable () -> Unit = {}) {
+    TopAppBar(
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(painterResource(R.drawable.ic_ingroupe_emblem), null, Modifier.size(32.dp))
+                Column(Modifier.padding(start = 10.dp)) {
+                    Text(stringResource(R.string.app_name), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text("by IN Groupe", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                }
+            }
+        },
+        actions = { actions() },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun SimpleTopBar(title: String, onBack: (() -> Unit)? = null, actions: @Composable () -> Unit = {}) {
     TopAppBar(
         title = { Text(title) },
@@ -87,12 +114,14 @@ fun HomeScreen(
     onOpen: (String) -> Unit,
     onPresent: () -> Unit,
     onSettings: () -> Unit,
+    onHelp: () -> Unit,
 ) {
     val docs by vm.repository.documents.collectAsState()
     val blePermissions = rememberBlePermissions()
     Scaffold(
         topBar = {
-            SimpleTopBar("eMRTD PID Wallet", actions = {
+            BrandTopBar(actions = {
+                IconButton(onClick = onHelp) { Icon(Icons.AutoMirrored.Filled.HelpOutline, "How it works") }
                 IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "Settings") }
             })
         },
@@ -107,7 +136,7 @@ fun HomeScreen(
             if (docs.isEmpty()) {
                 item {
                     Column(Modifier.fillMaxWidth().padding(top = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Filled.Badge, null, Modifier.size(72.dp), tint = MaterialTheme.colorScheme.primary)
+                        Image(painterResource(R.drawable.logo_ingroupe), "IN Groupe", Modifier.height(72.dp))
                         Spacer(Modifier.height(12.dp))
                         Text("No PID yet", style = MaterialTheme.typography.titleLarge)
                         Text(
@@ -144,16 +173,41 @@ fun PidCard(doc: IssuedDocument, onClick: () -> Unit) {
     val pid = remember(doc.id) { doc.pid() }
     Card(
         Modifier.fillMaxWidth().clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
     ) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Portrait(pid["portrait"] as? ByteArray, 72)
-            Column(Modifier.padding(start = 16.dp).weight(1f)) {
-                Text("EU PID", style = MaterialTheme.typography.labelMedium)
-                Text("${pid["given_name"] ?: ""} ${pid["family_name"] ?: ""}".trim(),
-                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("Born ${formatValue(pid["birth_date"])}", style = MaterialTheme.typography.bodySmall)
-                Text("Valid until ${formatValue(pid["expiry_date"])} · ${doc.name}", style = MaterialTheme.typography.bodySmall)
+        Box(Modifier.fillMaxWidth().background(Brush.linearGradient(InGroupe.CardGradient))) {
+            // Emblem watermark
+            Image(
+                painterResource(R.drawable.ic_ingroupe_emblem), null,
+                Modifier.size(150.dp).align(Alignment.CenterEnd).offset(x = 40.dp).alpha(0.18f),
+            )
+            Column(Modifier.padding(18.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(painterResource(R.drawable.ic_ingroupe_emblem), null, Modifier.size(28.dp))
+                    Column(Modifier.padding(start = 8.dp).weight(1f)) {
+                        Text("Person Identification Data", color = Color.White,
+                            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                        Text("Issued by IN Groupe · ${pid["issuing_country"] ?: "EU"}", color = Color.White.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.labelSmall)
+                    }
+                    Text("PID", color = InGroupe.Red, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.background(Color.White, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp))
+                }
+                Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.clip(RoundedCornerShape(10.dp)).background(Color.White)) {
+                        Portrait(pid["portrait"] as? ByteArray, 72)
+                    }
+                    Column(Modifier.padding(start = 16.dp).weight(1f)) {
+                        Text("${pid["given_name"] ?: ""} ${pid["family_name"] ?: ""}".trim(), color = Color.White,
+                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Born ${formatValue(pid["birth_date"])}", color = Color.White.copy(alpha = 0.9f),
+                            style = MaterialTheme.typography.bodySmall)
+                        Text("Valid until ${formatValue(pid["expiry_date"])}", color = Color.White.copy(alpha = 0.9f),
+                            style = MaterialTheme.typography.bodySmall)
+                        Text(doc.name, color = InGroupe.SkyBlue, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             }
         }
     }

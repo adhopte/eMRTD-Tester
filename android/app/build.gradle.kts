@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -13,8 +14,8 @@ android {
         applicationId = "io.github.adhopte.emrtdwallet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.1.0"
+        versionCode = 5
+        versionName = "1.2.0"
         // Default issuer backend; can be changed at runtime in Settings.
         // Override at build time: ./gradlew assembleDebug -PissuerUrl=https://my-issuer.onrender.com
         // (http://10.0.2.2:8000 is the host machine when running in the Android emulator.)
@@ -53,6 +54,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+    testOptions {
+        // Robolectric screenshot tests (Roborazzi) render Compose screens on the JVM
+        unitTests.isIncludeAndroidResources = true
     }
     buildFeatures {
         compose = true
@@ -117,4 +122,10 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    debugImplementation(libs.compose.ui.test.manifest)
 }

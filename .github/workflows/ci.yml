@@ -37,26 +37,34 @@ jobs:
       # Default issuer URL baked into the APK; override with the repository variable ISSUER_URL
       - run: ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease --no-daemon -PissuerUrl=${{ vars.ISSUER_URL || 'https://emrtd-pid-issuer.onrender.com' }}
       - run: |
-          cp app/build/outputs/apk/release/app-release.apk app/build/outputs/emrtd-pid-wallet.apk
-          cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/emrtd-pid-wallet-debug.apk
+          cp app/build/outputs/apk/release/app-release.apk app/build/outputs/getyourid-wallet.apk
+          cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/getyourid-wallet-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: emrtd-pid-wallet-apks
-          path: android/app/build/outputs/emrtd-pid-wallet*.apk
+          name: getyourid-wallet-apks
+          path: android/app/build/outputs/getyourid-wallet*.apk
       # Publish the plain APK (not zipped) as a rolling pre-release for easy phone download
+      - name: Remove APKs with the old app name from the pre-release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for f in emrtd-pid-wallet.apk emrtd-pid-wallet-debug.apk; do
+            gh release delete-asset dev-build "$f" -y --repo "${{ github.repository }}" || true
+          done
       - name: Publish APK to the "dev-build" pre-release
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: dev-build
-          name: Development build (latest push)
+          name: getYourID Wallet — development build (latest push)
           prerelease: true
           make_latest: false
           body: |
             Build of `${{ github.sha }}` from `${{ github.ref_name }}`.
-            Install **emrtd-pid-wallet.apk** (release build, Android 8+). The -debug APK also allows plain-HTTP issuers on your LAN.
+            Install **getyourid-wallet.apk** (release build, Android 8+). The -debug APK also allows plain-HTTP issuers on your LAN.
             Default issuer: ${{ vars.ISSUER_URL || 'https://emrtd-pid-issuer.onrender.com' }} (changeable in Settings).
             Signed with the public development key in android/keystore — updates install over earlier dev builds.
           files: |
-            android/app/build/outputs/emrtd-pid-wallet.apk
-            android/app/build/outputs/emrtd-pid-wallet-debug.apk
+            android/app/build/outputs/getyourid-wallet.apk
+            android/app/build/outputs/getyourid-wallet-debug.apk

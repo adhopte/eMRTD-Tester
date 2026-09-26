@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     csca_dir: str = "data/csca"
 
     issuer_country: str = "EU"
-    issuer_organization: str = "Dummy Citizen PID Issuer"
-    issuing_authority: str = "Dummy Citizen PID Issuer (TEST)"
+    issuer_organization: str = "IN Groupe"
+    issuing_authority: str = "IN Groupe Issuer (TEST)"
     pid_max_validity_days: int = 365
 
     # --- eMRTD issuance policy ---

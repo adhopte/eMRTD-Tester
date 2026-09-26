@@ -20,11 +20,12 @@
     <application
         android:name=".WalletApp"
         android:allowBackup="false"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
-        android:theme="@style/Theme.EmrtdWallet">
+        android:theme="@style/Theme.GetYourIdWallet">
 
         <activity
             android:name=".MainActivity"

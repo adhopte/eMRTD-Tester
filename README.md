@@ -1,4 +1,4 @@
-# eMRTD → EU PID Wallet
+# getYourID Wallet by IN Groupe: eMRTD → EU PID
 
 An Android wallet app plus a backend that turns a passport or ID card into an **EU Person Identification Data (PID)** credential in **ISO/IEC 18013-5 mdoc** format (`eu.europa.ec.eudi.pid.1`). The PID is signed by a dummy "citizen PKI" issuer. You can present it to EU wallet **web verifiers** (OpenID4VP) and to **proximity verifiers** (ISO 18013-5 over QR/NFC engagement and BLE).
 
@@ -9,7 +9,7 @@ You can onboard in one of two ways:
 | **MRZ scan → NFC chip read** | ICAO eMRTDs (e-passports, eID cards) | Passive Authentication, Active Authentication, Chip Authentication, all checked by the server | high |
 | **Document image scan** | documents without a chip, or with an unreadable chip | image quality, format/geometry, photocopy and screen-recapture heuristics, portrait presence, MRZ check digits, VIZ↔MRZ consistency, expiry, specimen marks | low (heuristic) |
 
-> ⚠️ **Test system.** The issuer PKI is generated locally and is not trusted by anyone. The image-based authenticity checks are heuristics, not forensic document verification. Don't use either for real identity assurance without the hardening described below.
+> ⚠️ **Test system.** The issuer PKI ("IN Groupe Issuer IACA (TEST)") is a test PKI whose private keys are published in this repo, so it must not be trusted outside testing. The image-based authenticity checks are heuristics, not forensic document verification. Don't use either for real identity assurance without the hardening described below.
 
 ```
 ┌──────────────── Android app (Kotlin / Compose) ───────────────┐          ┌────────────── Backend (Python / FastAPI) ──────────────┐
@@ -115,7 +115,7 @@ The **test issuer PKI is committed** in `backend/data/pki/` and baked into the i
 2. Render reads `render.yaml` and shows the service `emrtd-pid-issuer` on the free plan in Frankfurt. Click **Apply** or **Deploy Blueprint**.
 3. Wait for the first build (about 5–8 minutes), then check:
    - `https://emrtd-pid-issuer.onrender.com/health` returns `{"status":"ok",...}`
-   - `https://emrtd-pid-issuer.onrender.com/pki/iaca.pem` matches `backend/data/pki/iaca.pem` (SHA-256 fingerprint `8B:6F:5D:73:…:66:90:07`)
+   - `https://emrtd-pid-issuer.onrender.com/pki/iaca.pem` matches `backend/data/pki/iaca.pem` (SHA-256 fingerprint `EB:84:17:E2:…:C4:16`)
 4. The app's default issuer URL is already `https://emrtd-pid-issuer.onrender.com`.
 
 Render may give the service a different URL, e.g. `emrtd-pid-issuer-abcd.onrender.com` if the name is taken. In that case:
@@ -152,14 +152,14 @@ Main libraries:
 
 ### Installing the APK on a phone
 
-Download **`emrtd-pid-wallet.apk`** (release build, about 45 MB) from the repo's **Releases → Development build (latest push)**. Use `emrtd-pid-wallet-debug.apk` only if you need a plain-HTTP issuer on your LAN. This is a plain APK, so you don't need to unzip anything. It runs on Android 8.0+ and on 64-bit or 32-bit ARM phones.
+Download **`getyourid-wallet.apk`** (release build, about 45 MB) from the repo's **Releases → Development build (latest push)**. Use `getyourid-wallet-debug.apk` only if you need a plain-HTTP issuer on your LAN. This is a plain APK, so you don't need to unzip anything. It runs on Android 8.0+ and on 64-bit or 32-bit ARM phones.
 
 If the phone says **"App not installed"**:
 - **An older copy is installed.** Uninstall it first. Builds made before version 1.0.1 were signed with random debug keys, so they can't be updated in place. Builds from 1.0.1 onwards all share the public dev key in `android/keystore/`, so later versions install as updates.
 - **Not enough storage.** Free at least about 400 MB; the APK is about 130 MB.
 - **Play Protect or an "unknown sources" prompt.** Choose *More details → Install anyway*, and allow installs from your browser or file manager.
 - **Generic "The app wasn't installed" from Files by Google:** open the APK from Chrome's *Downloads* or the system *Files* app instead. The system installer names the actual reason, such as "isn't compatible", "conflicts with an existing package" or "package appears to be invalid". Also check *Settings → Apps* (including Dual apps, Second space and Work profile) for a leftover copy.
-- **Still failing?** Connect the phone with USB debugging on and run `adb install -r emrtd-pid-wallet-debug.apk`. It prints the exact reason, for example `INSTALL_FAILED_NO_MATCHING_ABIS` or `INSTALL_FAILED_UPDATE_INCOMPATIBLE`.
+- **Still failing?** Connect the phone with USB debugging on and run `adb install -r getyourid-wallet-debug.apk`. It prints the exact reason, for example `INSTALL_FAILED_NO_MATCHING_ABIS` or `INSTALL_FAILED_UPDATE_INCOMPATIBLE`.
 
 ## Presenting the PID
 
