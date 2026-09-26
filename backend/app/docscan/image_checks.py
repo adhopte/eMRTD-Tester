@@ -53,7 +53,8 @@ def exposure(img: np.ndarray) -> tuple[float, float, float]:
 
 def colourfulness(img: np.ndarray) -> float:
     """Hasler & Süsstrunk colourfulness metric; photocopies / greyscale prints score near 0."""
-    b, g, r = cv2.split(img.astype("float"))
+    small = resize_max(img, 600)  # statistic is scale-invariant; keeps float buffers tiny
+    b, g, r = cv2.split(small.astype(np.float32))
     rg = np.abs(r - g)
     yb = np.abs(0.5 * (r + g) - b)
     return float(np.sqrt(rg.std() ** 2 + yb.std() ** 2) + 0.3 * np.sqrt(rg.mean() ** 2 + yb.mean() ** 2))
@@ -133,8 +134,11 @@ def find_faces(img: np.ndarray) -> list[tuple[int, int, int, int]]:
         _face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     gray = cv2.equalizeHist(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))
     min_side = max(24, min(img.shape[:2]) // 12)
-    faces = _face_cascade.detectMultiScale(gray, scaleFactor=1.08, minNeighbors=6, minSize=(min_side, min_side))
-    return sorted((tuple(int(v) for v in f) for f in faces), key=lambda f: f[2] * f[3], reverse=True)
+    faces = _face_cascade.detectMultiScale(gray, scaleFactor=1.08, minNeighbors=8, minSize=(min_side, min_side))
+    # Document portraits sit above the MRZ band; text in the bottom 30% can fool the cascade
+    h = img.shape[0]
+    faces = [tuple(int(v) for v in f) for f in faces if f[1] + f[3] / 2 < 0.7 * h]
+    return sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
 
 
 def crop_portrait(img: np.ndarray, face: tuple[int, int, int, int]) -> bytes:

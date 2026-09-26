@@ -22,7 +22,7 @@ object DocumentOcr {
     }
 
     /** Decode a JPEG, apply its EXIF orientation and re-encode it upright at a bounded size. */
-    fun normalizeJpeg(jpeg: ByteArray, maxSide: Int = 2400): ByteArray {
+    fun normalizeJpeg(jpeg: ByteArray, maxSide: Int = 1800): ByteArray {
         var bmp = decodeUpright(jpeg)
         val scale = maxSide.toFloat() / maxOf(bmp.width, bmp.height)
         if (scale < 1f) bmp = Bitmap.createScaledBitmap(bmp, (bmp.width * scale).toInt(), (bmp.height * scale).toInt(), true)

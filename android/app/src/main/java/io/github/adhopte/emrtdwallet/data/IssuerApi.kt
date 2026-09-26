@@ -133,6 +133,12 @@ class IssuerApi(private val baseUrl: () -> String) {
     private fun execute(request: Request): String {
         client.newCall(request).execute().use { resp ->
             val text = resp.body?.string().orEmpty()
+            if (resp.code in 502..504) {
+                // Render (and most hosts) answer 502/503/504 themselves while the service restarts or wakes up
+                throw IssuerException(
+                    "The issuer server is restarting or waking up (HTTP ${resp.code}). Wait a moment and tap Verify again."
+                )
+            }
             if (!resp.isSuccessful) {
                 val detail = runCatching {
                     (json.parseToJsonElement(text) as JsonObject)["detail"].toString()

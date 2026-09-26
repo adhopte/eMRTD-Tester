@@ -20,7 +20,9 @@ SPECIMEN_WORDS = ("SPECIMEN", "SPÉCIMEN", "MUSTER", "EXEMPLAR", "VOORBEELD", "M
 class ScanThresholds:
     min_short_side: int = 600
     min_sharpness: float = 60.0
-    max_glare: float = 0.04
+    max_glare: float = 0.25        # fail only on extreme blow-out; white document areas are normal
+    warn_glare: float = 0.04
+    max_analysis_side: int = 1600  # analyse at this resolution to stay within small-instance memory
     min_colourfulness: float = 12.0
     max_moire: float = 60.0
     max_format_error: float = 0.08
@@ -77,13 +79,21 @@ def analyze(front: bytes, back: bytes | None, device_ocr_text: str, document_kin
         authenticity.passed("capture_source", "captured live with the app camera")
     weights: list[tuple[float, float]] = []  # (weight, score in [0,1])
 
-    images = {"front": ic.decode(front)}
-    if back:
-        images["back"] = ic.decode(back)
+    # Decode, remember the captured resolution, then analyse a bounded-size copy: full phone
+    # photos in float would need several hundred MB and get the process OOM-killed on 512 MB hosts.
+    original_sizes: dict[str, tuple[int, int]] = {}
+    images: dict = {}
+    for side, data in (("front", front), ("back", back)):
+        if not data:
+            continue
+        full = ic.decode(data)
+        original_sizes[side] = full.shape[1], full.shape[0]
+        images[side] = ic.resize_max(full, th.max_analysis_side)
+        del full
 
     geometry: dict[str, ic.DocumentGeometry] = {}
     for side, img in images.items():
-        h, w = img.shape[:2]
+        w, h = original_sizes[side]
         if min(h, w) >= th.min_short_side:
             quality.passed(f"{side}_resolution", f"{w}x{h}")
         else:
@@ -95,6 +105,8 @@ def analyze(front: bytes, back: bytes | None, device_ocr_text: str, document_kin
         mean, glare, dark = ic.exposure(img)
         if glare > th.max_glare:
             quality.failed(f"{side}_glare", f"{glare:.1%} of pixels saturated")
+        elif glare > th.warn_glare:
+            quality.warn(f"{side}_glare", f"{glare:.1%} of pixels very bright (glare or white document areas)")
         elif mean < 40 or mean > 235:
             quality.warn(f"{side}_exposure", f"mean brightness {mean:.0f}")
         else:
