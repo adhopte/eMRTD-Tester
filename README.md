@@ -143,6 +143,16 @@ Main libraries:
 - **ML Kit** does on-device OCR and **CameraX** handles the camera.
 - **EUDI `wallet-core` 0.30.2** provides Android-Keystore device keys, credential storage, **ISO 18013-5 proximity presentation** (QR and NFC engagement, BLE transfer) and **OpenID4VP** remote presentation, plus the consent UI flow.
 
+### Installing the APK on a phone
+
+Download `emrtd-pid-wallet-debug.apk` from the repo's **Releases → Development build (latest push)**. This is a plain APK, so you don't need to unzip anything. It runs on Android 8.0+ and on 64-bit or 32-bit ARM phones.
+
+If the phone says **"App not installed"**:
+- **An older copy is installed.** Uninstall it first. Builds made before version 1.0.1 were signed with random debug keys, so they can't be updated in place. Builds from 1.0.1 onwards all share the public dev key in `android/keystore/`, so later versions install as updates.
+- **Not enough storage.** Free at least about 400 MB; the APK is about 130 MB.
+- **Play Protect or an "unknown sources" prompt.** Choose *More details → Install anyway*, and allow installs from your browser or file manager.
+- **Still failing?** Connect the phone with USB debugging on and run `adb install -r emrtd-pid-wallet-debug.apk`. It prints the exact reason, for example `INSTALL_FAILED_NO_MATCHING_ABIS` or `INSTALL_FAILED_UPDATE_INCOMPATIBLE`.
+
 ## Presenting the PID
 
 - **Proximity verifiers** (ISO 18013-5), such as the EUDI reference verifier app or the multipaz verifier:
