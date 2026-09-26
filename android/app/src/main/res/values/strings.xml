@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">eMRTD PID Wallet</string>
+    <string name="nfc_engagement_service_desc">PID proximity presentation (ISO 18013-5)</string>
+</resources>

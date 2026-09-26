@@ -29,8 +29,6 @@ class Settings(BaseSettings):
     # --- Document image policy ---
     scan_min_score: float = 0.75
     scan_allow_specimen: bool = False
-    # Portrait crops / uploaded images are never stored unless explicitly enabled
-    store_uploads: bool = False
 
 
 @lru_cache

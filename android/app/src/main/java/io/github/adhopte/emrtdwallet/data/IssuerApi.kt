@@ -1,0 +1,136 @@
+package io.github.adhopte.emrtdwallet.data
+
+import android.util.Base64
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
+import java.util.concurrent.TimeUnit
+
+fun ByteArray.b64(): String = Base64.encodeToString(this, Base64.NO_WRAP)
+
+fun String.b64url(): ByteArray = Base64.decode(this, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+
+@Serializable
+data class ChallengeRequest(val dg14: String? = null)
+
+@Serializable
+data class ChipAuthChallenge(
+    val oid: String,
+    val key_id: Long? = null,
+    val agreement: String,
+    val terminal_public_key: String,
+    val protected_command: String,
+    val read_sfi: Int,
+    val read_length: Int,
+)
+
+@Serializable
+data class ChallengeResponse(
+    val session_id: String,
+    val aa_challenge: String,
+    val chip_authentication: ChipAuthChallenge? = null,
+    val chip_authentication_error: String? = null,
+    val expires_in: Int,
+)
+
+@Serializable
+data class EmrtdIssueRequest(
+    val session_id: String,
+    val sod: String,
+    val data_groups: Map<String, String>,
+    val active_auth_signature: String? = null,
+    val chip_auth_response: String? = null,
+    val access_control: String? = null,
+    val device_key: String,
+)
+
+@Serializable
+data class Credential(
+    val format: String,
+    val doctype: String,
+    val issuer_signed: String,
+    val valid_until: String,
+    val claims: JsonObject,
+    val has_portrait: Boolean = false,
+)
+
+@Serializable
+data class ReportCheck(val name: String, val status: String, val detail: String = "", val data: JsonElement? = null)
+
+@Serializable
+data class ReportSection(val name: String, val status: String, val checks: List<ReportCheck>)
+
+@Serializable
+data class IssueResponse(
+    val decision: String,
+    val reasons: List<String> = emptyList(),
+    val score: Double? = null,
+    val report: List<ReportSection> = emptyList(),
+    val credential: Credential? = null,
+)
+
+class IssuerException(message: String) : IOException(message)
+
+/** Client for the PID issuer backend (see backend/app/main.py). */
+class IssuerApi(private val baseUrl: () -> String) {
+
+    private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .build()
+    private val jsonType = "application/json".toMediaType()
+
+    suspend fun challenge(dg14: ByteArray?): ChallengeResponse =
+        post("/api/v1/emrtd/challenge", json.encodeToString(ChallengeRequest.serializer(), ChallengeRequest(dg14?.b64())))
+            .let { json.decodeFromString(ChallengeResponse.serializer(), it) }
+
+    suspend fun issueFromEmrtd(req: EmrtdIssueRequest): IssueResponse =
+        post("/api/v1/emrtd/issue", json.encodeToString(EmrtdIssueRequest.serializer(), req))
+            .let { json.decodeFromString(IssueResponse.serializer(), it) }
+
+    suspend fun issueFromImages(
+        front: ByteArray,
+        back: ByteArray?,
+        ocrText: String,
+        documentKind: String,
+        deviceKey: ByteArray,
+    ): IssueResponse = withContext(Dispatchers.IO) {
+        val jpeg = "image/jpeg".toMediaType()
+        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("front", "front.jpg", front.toRequestBody(jpeg))
+            .apply { if (back != null) addFormDataPart("back", "back.jpg", back.toRequestBody(jpeg)) }
+            .addFormDataPart("device_ocr_text", ocrText)
+            .addFormDataPart("document_kind", documentKind)
+            .addFormDataPart("device_key", deviceKey.b64())
+            .build()
+        val text = execute(Request.Builder().url(baseUrl() + "/api/v1/document/issue").post(body).build())
+        json.decodeFromString(IssueResponse.serializer(), text)
+    }
+
+    private suspend fun post(path: String, body: String): String = withContext(Dispatchers.IO) {
+        execute(Request.Builder().url(baseUrl() + path).post(body.toRequestBody(jsonType)).build())
+    }
+
+    private fun execute(request: Request): String {
+        client.newCall(request).execute().use { resp ->
+            val text = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) {
+                val detail = runCatching {
+                    (json.parseToJsonElement(text) as JsonObject)["detail"].toString()
+                }.getOrDefault(text.take(200))
+                throw IssuerException("Issuer returned HTTP ${resp.code}: $detail")
+            }
+            return text
+        }
+    }
+}
