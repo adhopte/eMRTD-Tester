@@ -31,8 +31,9 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon
+      # Default issuer URL baked into the APK; override with the repository variable ISSUER_URL
+      - run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon -PissuerUrl=${{ vars.ISSUER_URL || 'https://emrtd-pid-issuer.onrender.com' }}
       - uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: emrtd-pid-wallet-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
