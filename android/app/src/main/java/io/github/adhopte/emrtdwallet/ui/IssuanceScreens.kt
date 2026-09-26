@@ -3,6 +3,16 @@ package io.github.adhopte.emrtdwallet.ui
 import android.app.Activity
 import android.graphics.BitmapFactory
 import android.nfc.NfcAdapter
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.runtime.rememberCoroutineScope
+import io.github.adhopte.emrtdwallet.docscan.DocumentOcr
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
@@ -217,6 +227,29 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
     val needBack = kind == "id_card"
     val capturingBack = front != null && needBack && back == null
     val ready = front != null && (!needBack || back != null)
+    val scope = rememberCoroutineScope()
+    var loading by remember { mutableStateOf(false) }
+    var uploaded by remember { mutableStateOf(false) }
+
+    // Assign a captured or uploaded image to the next empty side (front first, then back)
+    fun accept(bytes: ByteArray) {
+        if (front == null) front = bytes else back = bytes
+    }
+
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        loading = true
+        scope.launch {
+            try {
+                accept(withContext(Dispatchers.Default) { DocumentOcr.loadImage(context, uri) })
+                uploaded = true
+            } catch (e: Exception) {
+                error = e.message ?: "Could not read the selected image"
+            } finally {
+                loading = false
+            }
+        }
+    }
 
     LaunchedEffect(state) { if (state is IssuanceState.Finished) onDone() }
 
@@ -237,33 +270,54 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
                 else -> Unit
             }
             if (!ready) {
-                if (!rememberCameraPermission()) {
-                    Text("Camera permission is required.")
-                    return@Column
-                }
+                val cameraAllowed = rememberCameraPermission()
                 Text(
                     when {
-                        capturingBack -> "Now photograph the BACK of the card (with the MRZ)."
-                        kind == "passport" -> "Photograph the passport photo page. Fill the frame, avoid glare, " +
-                            "place it on a dark, plain surface."
-                        else -> "Photograph the FRONT of the ID card (with the portrait)."
+                        capturingBack -> "Now the BACK of the card (with the MRZ): photograph it or upload an image."
+                        kind == "passport" -> "Photograph the passport photo page — fill the frame, avoid glare, " +
+                            "place it on a dark, plain surface — or upload an existing image."
+                        else -> "The FRONT of the ID card (with the portrait): photograph it or upload an image."
                     },
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                Box(Modifier.fillMaxWidth().aspectRatio(0.75f)) { CameraPreview(Modifier.fillMaxSize(), imageCapture = capture) }
-                Button(onClick = {
-                    capture.takePicture(ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageCapturedCallback() {
-                        override fun onCaptureSuccess(image: ImageProxy) {
-                            val bytes = image.toJpegBytes()
-                            image.close()
-                            if (front == null) front = bytes else back = bytes
-                        }
+                if (cameraAllowed) {
+                    Box(Modifier.fillMaxWidth().aspectRatio(0.75f)) { CameraPreview(Modifier.fillMaxSize(), imageCapture = capture) }
+                } else {
+                    Text("Camera permission not granted — you can still upload images.",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    if (cameraAllowed) {
+                        Button(onClick = {
+                            error = null
+                            capture.takePicture(ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageCapturedCallback() {
+                                override fun onCaptureSuccess(image: ImageProxy) {
+                                    val bytes = image.toJpegBytes()
+                                    image.close()
+                                    accept(bytes)
+                                }
 
-                        override fun onError(exception: ImageCaptureException) {
-                            error = exception.message
+                                override fun onError(exception: ImageCaptureException) {
+                                    error = exception.message
+                                }
+                            })
+                        }, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Filled.PhotoCamera, null)
+                            Text(if (capturingBack) " Capture back" else " Capture", maxLines = 1)
                         }
-                    })
-                }, modifier = Modifier.fillMaxWidth()) { Text(if (capturingBack) "Capture back" else "Capture") }
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            error = null
+                            picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(Icons.Filled.Image, null)
+                        Text(if (capturingBack) " Upload back" else " Upload image", maxLines = 1)
+                    }
+                }
+                if (loading) CircularProgressIndicator()
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -272,8 +326,8 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
             }
             if (front != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { front = null; back = null; vm.resetIssuance() }) { Text("Retake") }
-                    Button(onClick = { vm.submitImages(front!!, back, kind) }, enabled = ready) { Text("Verify & issue PID") }
+                    OutlinedButton(onClick = { front = null; back = null; uploaded = false; error = null; vm.resetIssuance() }) { Text("Start over") }
+                    Button(onClick = { vm.submitImages(front!!, back, kind, uploaded) }, enabled = ready) { Text("Verify & issue PID") }
                 }
             }
         }

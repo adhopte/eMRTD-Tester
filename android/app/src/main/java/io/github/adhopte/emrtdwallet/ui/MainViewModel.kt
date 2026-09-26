@@ -61,7 +61,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun submitImages(front: ByteArray, back: ByteArray?, kind: String) {
+    fun submitImages(front: ByteArray, back: ByteArray?, kind: String, uploaded: Boolean) {
         _issuance.value = IssuanceState.Working("Reading document text…")
         viewModelScope.launch {
             try {
@@ -73,7 +73,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     b?.let { append("\n").append(DocumentOcr.recognize(it)) }
                 }
                 _issuance.value = IssuanceState.Working("Validating document and issuing PID…")
-                _issuance.value = IssuanceState.Finished(repository.issueFromImages(f, b, ocr, kind))
+                _issuance.value = IssuanceState.Finished(repository.issueFromImages(f, b, ocr, kind, uploaded))
             } catch (e: Exception) {
                 _issuance.value = IssuanceState.Failed(friendly(e))
             }

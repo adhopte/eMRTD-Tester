@@ -110,6 +110,7 @@ class IssuerApi(private val baseUrl: () -> String) {
         back: ByteArray?,
         ocrText: String,
         documentKind: String,
+        imageSource: String,
         deviceKey: ByteArray,
     ): IssueResponse = withContext(Dispatchers.IO) {
         val jpeg = "image/jpeg".toMediaType()
@@ -118,6 +119,7 @@ class IssuerApi(private val baseUrl: () -> String) {
             .apply { if (back != null) addFormDataPart("back", "back.jpg", back.toRequestBody(jpeg)) }
             .addFormDataPart("device_ocr_text", ocrText)
             .addFormDataPart("document_kind", documentKind)
+            .addFormDataPart("image_source", imageSource)
             .addFormDataPart("device_key", deviceKey.b64())
             .build()
         val text = execute(Request.Builder().url(baseUrl() + "/api/v1/document/issue").post(body).build())

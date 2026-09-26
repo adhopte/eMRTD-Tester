@@ -76,8 +76,15 @@ class WalletRepository(context: Context, val wallet: EudiWallet, val api: Issuer
         )
     }
 
-    suspend fun issueFromImages(front: ByteArray, back: ByteArray?, ocrText: String, kind: String): IssuanceOutcome =
-        issue("PID (document scan)") { deviceKey -> api.issueFromImages(front, back, ocrText, kind, deviceKey) }
+    suspend fun issueFromImages(
+        front: ByteArray,
+        back: ByteArray?,
+        ocrText: String,
+        kind: String,
+        uploaded: Boolean,
+    ): IssuanceOutcome = issue("PID (document scan)") { deviceKey ->
+        api.issueFromImages(front, back, ocrText, kind, if (uploaded) "upload" else "camera", deviceKey)
+    }
 
     private suspend fun issue(name: String, call: suspend (ByteArray) -> IssueResponse): IssuanceOutcome {
         val unsigned = withContext(Dispatchers.IO) { createUnsigned(name) }

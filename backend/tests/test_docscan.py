@@ -40,12 +40,13 @@ def fake_face(monkeypatch):
     monkeypatch.setattr(image_checks, "find_faces", lambda img: [(80, 250, 360, 420)])
 
 
-def post(client, img, text):
+def post(client, img, text, source="camera"):
     k = ec.generate_private_key(ec.SECP256R1())
     dk = base64.b64encode(cbor2.dumps(ec_to_cose_key(k.public_key()))).decode()
     return client.post("/api/v1/document/issue",
                        files={"front": ("front.jpg", img, "image/jpeg")},
-                       data={"device_key": dk, "device_ocr_text": text, "document_kind": "id_card"}).json()
+                       data={"device_key": dk, "device_ocr_text": text, "document_kind": "id_card",
+                             "image_source": source}).json()
 
 
 def checks(res):
@@ -83,3 +84,11 @@ def test_viz_mismatch_rejected(client, fake_face):
 def test_no_face_rejected(client):
     res = post(client, synthetic_card(MRZ, VIZ), "\n".join(VIZ) + "\n" + MRZ)
     assert res["decision"] == "rejected"
+
+
+def test_uploaded_image_is_flagged_but_accepted(client, fake_face):
+    res = post(client, synthetic_card(MRZ, VIZ), "\n".join(VIZ) + "\n" + MRZ, source="upload")
+    assert res["decision"] == "accepted", res["reasons"]
+    assert checks(res)["document_authenticity_heuristics.capture_source"] == "warn"
+    evidence = res["credential"]["claims"]["org.emrtd-tester.evidence.1"]
+    assert evidence["verification_checks"]["image_source"] == "upload"

@@ -241,8 +241,11 @@ async def document_issue(
     device_key: str = Form(...),
     device_ocr_text: str = Form("", description="text recognised on-device (ML Kit), all sides"),
     document_kind: str | None = Form(None, description="passport | id_card"),
+    image_source: str = Form("camera", description="camera (captured live in the app) | upload (picked from files)"),
 ) -> dict:
     key = parse_device_key(device_key)
+    if image_source not in ("camera", "upload"):
+        raise HTTPException(400, "image_source must be 'camera' or 'upload'")
     s = state.settings
     front_bytes = await front.read()
     back_bytes = await back.read() if back is not None else None
@@ -250,7 +253,8 @@ async def document_issue(
         raise HTTPException(413, "image too large")
     try:
         result = analyze(front_bytes, back_bytes or None, device_ocr_text, document_kind,
-                         ScanThresholds(min_score=s.scan_min_score, allow_specimen=s.scan_allow_specimen))
+                         ScanThresholds(min_score=s.scan_min_score, allow_specimen=s.scan_allow_specimen),
+                         image_source=image_source)
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
     body: dict[str, Any] = {

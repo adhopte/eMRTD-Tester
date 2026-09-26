@@ -64,12 +64,17 @@ def _date_variants(d: dt.date) -> list[str]:
 
 
 def analyze(front: bytes, back: bytes | None, device_ocr_text: str, document_kind: str | None,
-            th: ScanThresholds, today: dt.date | None = None) -> ScanResult:
+            th: ScanThresholds, today: dt.date | None = None, image_source: str = "camera") -> ScanResult:
     today = today or dt.date.today()
     quality = Section("image_quality")
     authenticity = Section("document_authenticity_heuristics")
     content = Section("document_content")
     sections = [quality, authenticity, content]
+    if image_source == "upload":
+        authenticity.warn("capture_source", "image uploaded from the device, not captured live in the app "
+                          "(it may have been edited; treat as lower assurance)")
+    else:
+        authenticity.passed("capture_source", "captured live with the app camera")
     weights: list[tuple[float, float]] = []  # (weight, score in [0,1])
 
     images = {"front": ic.decode(front)}
@@ -147,7 +152,7 @@ def analyze(front: bytes, back: bytes | None, device_ocr_text: str, document_kin
     mrz = mrz_mod.find_in_text(all_text)
     if mrz is None:
         content.failed("mrz_found", "no machine readable zone could be read")
-        return _finish(sections, weights, None, None, th)
+        return _finish(sections, weights, None, None, th, image_source)
     content.passed("mrz_found", f"{mrz.format} MRZ read", mrz.to_dict())
     bad = [k for k, v in mrz.checks.items() if not v]
     if bad:
@@ -214,10 +219,10 @@ def analyze(front: bytes, back: bytes | None, device_ocr_text: str, document_kin
             portrait_jpeg=portrait,
             evidence_type="document_image",
         )
-    return _finish(sections, weights, mrz, evidence, th)
+    return _finish(sections, weights, mrz, evidence, th, image_source)
 
 
-def _finish(sections, weights, mrz, evidence, th: ScanThresholds) -> ScanResult:
+def _finish(sections, weights, mrz, evidence, th: ScanThresholds, image_source: str = "camera") -> ScanResult:
     total = sum(w for w, _ in weights) or 1.0
     score = sum(w * s for w, s in weights) / total
     reasons = [f"{s.name}.{c.name}: {c.detail}" for s in sections for c in s.checks if c.status == Status.FAIL]
@@ -229,5 +234,5 @@ def _finish(sections, weights, mrz, evidence, th: ScanThresholds) -> ScanResult:
     else:
         decision = "accepted"
     if evidence is not None:
-        evidence.evidence_checks = {"score": round(score, 3), "decision": decision}
+        evidence.evidence_checks = {"score": round(score, 3), "decision": decision, "image_source": image_source}
     return ScanResult(sections, score, mrz, evidence, decision, reasons)
