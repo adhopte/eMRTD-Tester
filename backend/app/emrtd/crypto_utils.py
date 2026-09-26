@@ -160,6 +160,21 @@ def plain_to_der_ecdsa(sig: bytes) -> bytes:
     return encode_dss_signature(int.from_bytes(sig[:half], "big"), int.from_bytes(sig[half:], "big"))
 
 
+def ecdsa_to_der(signature: bytes, curve: ec.EllipticCurve) -> bytes:
+    """Normalise an ECDSA signature to DER. eMRTD chips return TR-03111 plain r||s; CMS uses DER.
+
+    Decide by structure, not by the first byte: a plain signature whose r starts with 0x30
+    would otherwise be mistaken for DER (about 1 in 256 signatures).
+    """
+    size = curve_byte_len(curve)
+    if len(signature) == 2 * size:
+        return plain_to_der_ecdsa(signature)
+    from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+
+    decode_dss_signature(signature)  # raises ValueError if it is not valid DER either
+    return signature
+
+
 def ec_point_bytes(key: ec.EllipticCurvePublicKey) -> bytes:
     return key.public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
 
@@ -198,9 +213,7 @@ def verify_signature(pub: ChipPublicKey, signature: bytes, data: bytes, sig_algo
         mgf_h = hash_by_name(params["mask_gen_algorithm"]["parameters"]["algorithm"].native)
         pub.key.verify(signature, data, padding.PSS(padding.MGF1(mgf_h), params["salt_length"].native), h)
     elif name == "ecdsa":
-        if not signature.startswith(b"\x30"):
-            signature = plain_to_der_ecdsa(signature)
-        pub.key.verify(signature, data, ec.ECDSA(hash_by_name(hash_name)))
+        pub.key.verify(ecdsa_to_der(signature, pub.key.curve), data, ec.ECDSA(hash_by_name(hash_name)))
     else:
         raise ValueError(f"unsupported signature algorithm {sig_algo['algorithm'].native}")
 

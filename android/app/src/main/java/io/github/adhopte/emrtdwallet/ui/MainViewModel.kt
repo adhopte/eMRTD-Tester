@@ -68,9 +68,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val (f, b) = withContext(Dispatchers.Default) {
                     DocumentOcr.normalizeJpeg(front) to back?.let(DocumentOcr::normalizeJpeg)
                 }
+                // OCR at higher resolution than the upload: on full-page scans the MRZ is small
                 val ocr = buildString {
-                    append(DocumentOcr.recognize(f))
-                    b?.let { append("\n").append(DocumentOcr.recognize(it)) }
+                    append(DocumentOcr.recognize(withContext(Dispatchers.Default) { DocumentOcr.normalizeJpeg(front, 3000) }))
+                    back?.let {
+                        val hi = withContext(Dispatchers.Default) { DocumentOcr.normalizeJpeg(it, 3000) }
+                        append("\n").append(DocumentOcr.recognize(hi))
+                    }
                 }
                 _issuance.value = IssuanceState.Working("Validating document and issuing PID…")
                 _issuance.value = IssuanceState.Finished(repository.issueFromImages(f, b, ocr, kind, uploaded))

@@ -31,20 +31,29 @@ class ActiveAuthError(ValueError):
 
 
 def verify_rsa_9796_2(public_key: rsa.RSAPublicKey, challenge: bytes, signature: bytes) -> str:
-    """Verify an ISO/IEC 9796-2 Digital Signature Scheme 1 signature. Returns the hash name used."""
+    """Verify an ISO/IEC 9796-2 Digital Signature Scheme 1 signature. Returns the hash name used.
+
+    The chip may return s or n - s (whichever is smaller), so both recovered representatives
+    f and n - f are tried; checking only the trailer byte would occasionally pick the wrong one.
+    """
     nums = public_key.public_numbers()
     n, e = nums.n, nums.e
-    k = (n.bit_length() + 7) // 8
     s = int.from_bytes(signature, "big")
     if s >= n:
         raise ActiveAuthError("signature representative out of range")
     f = pow(s, e, n)
-    # The signer may have returned min(s, n - s): recover the correct representative
+    errors = []
+    for candidate in (f, n - f):
+        try:
+            return _check_9796_2(candidate, n, challenge)
+        except ActiveAuthError as err:
+            errors.append(str(err))
+    raise ActiveAuthError("; ".join(dict.fromkeys(errors)))
+
+
+def _check_9796_2(f: int, n: int, challenge: bytes) -> str:
+    k = (n.bit_length() + 7) // 8
     fb = f.to_bytes(k, "big")
-    if fb[-1] not in (0xBC, 0xCC):
-        f = n - f
-        fb = f.to_bytes(k, "big")
-    # Strip leading zero octets introduced by k*8 > |n|
     if fb[-1] == 0xBC:
         hash_name, t_len = "sha1", 1
     elif fb[-1] == 0xCC:
@@ -55,17 +64,15 @@ def verify_rsa_9796_2(public_key: rsa.RSAPublicKey, challenge: bytes, signature:
     else:
         raise ActiveAuthError("invalid 9796-2 trailer")
     h_len = cu.hash_by_name(hash_name).digest_size
-    # Header: first significant nibble must be 6 (partial recovery) or 4 (full recovery)
     stripped = fb.lstrip(b"\x00")
     header = stripped[0] >> 4
     if header not in (0x6, 0x4):
         raise ActiveAuthError(f"invalid 9796-2 header nibble {header:x}")
+    if header == 0x4:
+        raise ActiveAuthError("full message recovery signatures are not expected for AA")
     body = stripped[:-t_len]
     digest = body[-h_len:]
-    m1 = body[1:-h_len]  # skip the header octet (0x6A / 0x4B)
-    if header == 0x4:
-        # full recovery: padding of 0x0B...0xBA before the message; not used by eMRTDs with 8-byte challenges
-        raise ActiveAuthError("full message recovery signatures are not expected for AA")
+    m1 = body[1:-h_len]  # skip the header octet (0x6A)
     if not hmac.compare_digest(cu.digest(hash_name, m1 + challenge), digest):
         raise ActiveAuthError("hash of recovered message and challenge does not match")
     return hash_name
@@ -75,7 +82,10 @@ def verify_ecdsa(public_key: ec.EllipticCurvePublicKey, challenge: bytes, signat
                  signature_algorithm_oid: str | None) -> str:
     candidates = [_ECDSA_OIDS[signature_algorithm_oid]] if signature_algorithm_oid in _ECDSA_OIDS else \
         ["sha256", "sha1", "sha384", "sha512", "sha224"]
-    der = signature if signature[:1] == b"\x30" else cu.plain_to_der_ecdsa(signature)
+    try:
+        der = cu.ecdsa_to_der(signature, public_key.curve)
+    except ValueError as e:
+        raise ActiveAuthError("malformed ECDSA signature") from e
     for h in candidates:
         try:
             public_key.verify(der, challenge, ec.ECDSA(cu.hash_by_name(h)))

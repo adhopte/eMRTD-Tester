@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass, field
 
 from ..emrtd import mrz as mrz_mod
+from ..emrtd import mrz_repair
 from ..pid import IdentityEvidence
 from ..report import Section, Status
 from . import image_checks as ic
@@ -159,19 +160,24 @@ def analyze(front: bytes, back: bytes | None, device_ocr_text: str, document_kin
     # (ML Kit) does not already contain a check-digit-valid MRZ.
     server_text = ""
     server_mrz_text = ""
-    device_mrz = mrz_mod.find_in_text(device_ocr_text or "")
-    if device_mrz is None or not device_mrz.valid:
+    device_mrz = mrz_repair.repair(device_ocr_text or "")
+    if device_mrz is None:
         for side in images:
             server_mrz_text += "\n" + ocr.ocr_mrz(geometry[side].warped)
         if not (device_ocr_text or "").strip():
             for side in images:
                 server_text += "\n" + ocr.ocr_text(geometry[side].warped)
     all_text = "\n".join([device_ocr_text or "", server_mrz_text, server_text])
-    mrz = mrz_mod.find_in_text(all_text)
+    # OCR misreads (Z/2/1, S/5/8, M/N, '<' as K/E...) are repaired only where the ICAO check
+    # digits leave exactly one answer; printed (VIZ) text resolves ties and names.
+    exact = mrz_mod.find_in_text(all_text)
+    repaired = None if (exact is not None and exact.valid) else mrz_repair.repair(all_text, viz_text=all_text)
+    mrz = repaired or exact
     if mrz is None:
         content.failed("mrz_found", "no machine readable zone could be read")
         return _finish(sections, weights, None, None, th, image_source)
-    content.passed("mrz_found", f"{mrz.format} MRZ read", mrz.to_dict())
+    content.passed("mrz_found", f"{mrz.format} MRZ read"
+                   + (" (OCR errors corrected using the check digits)" if repaired else ""), mrz.to_dict())
     bad = [k for k, v in mrz.checks.items() if not v]
     if bad:
         content.failed("mrz_check_digits", "invalid check digit(s): " + ", ".join(bad))
