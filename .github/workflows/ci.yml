@@ -35,12 +35,14 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
       # Default issuer URL baked into the APK; override with the repository variable ISSUER_URL
-      - run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon -PissuerUrl=${{ vars.ISSUER_URL || 'https://emrtd-pid-issuer.onrender.com' }}
-      - run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/emrtd-pid-wallet-debug.apk
+      - run: ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease --no-daemon -PissuerUrl=${{ vars.ISSUER_URL || 'https://emrtd-pid-issuer.onrender.com' }}
+      - run: |
+          cp app/build/outputs/apk/release/app-release.apk app/build/outputs/emrtd-pid-wallet.apk
+          cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/emrtd-pid-wallet-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: emrtd-pid-wallet-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: emrtd-pid-wallet-apks
+          path: android/app/build/outputs/emrtd-pid-wallet*.apk
       # Publish the plain APK (not zipped) as a rolling pre-release for easy phone download
       - name: Publish APK to the "dev-build" pre-release
         if: github.event_name == 'push'
@@ -51,7 +53,10 @@ jobs:
           prerelease: true
           make_latest: false
           body: |
-            Debug build of `${{ github.sha }}` from `${{ github.ref_name }}`.
+            Build of `${{ github.sha }}` from `${{ github.ref_name }}`.
+            Install **emrtd-pid-wallet.apk** (release build, Android 8+). The -debug APK also allows plain-HTTP issuers on your LAN.
             Default issuer: ${{ vars.ISSUER_URL || 'https://emrtd-pid-issuer.onrender.com' }} (changeable in Settings).
             Signed with the public development key in android/keystore — updates install over earlier dev builds.
-          files: android/app/build/outputs/apk/debug/emrtd-pid-wallet-debug.apk
+          files: |
+            android/app/build/outputs/emrtd-pid-wallet.apk
+            android/app/build/outputs/emrtd-pid-wallet-debug.apk

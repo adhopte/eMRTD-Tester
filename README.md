@@ -145,12 +145,13 @@ Main libraries:
 
 ### Installing the APK on a phone
 
-Download `emrtd-pid-wallet-debug.apk` from the repo's **Releases → Development build (latest push)**. This is a plain APK, so you don't need to unzip anything. It runs on Android 8.0+ and on 64-bit or 32-bit ARM phones.
+Download **`emrtd-pid-wallet.apk`** (release build, about 45 MB) from the repo's **Releases → Development build (latest push)**. Use `emrtd-pid-wallet-debug.apk` only if you need a plain-HTTP issuer on your LAN. This is a plain APK, so you don't need to unzip anything. It runs on Android 8.0+ and on 64-bit or 32-bit ARM phones.
 
 If the phone says **"App not installed"**:
 - **An older copy is installed.** Uninstall it first. Builds made before version 1.0.1 were signed with random debug keys, so they can't be updated in place. Builds from 1.0.1 onwards all share the public dev key in `android/keystore/`, so later versions install as updates.
 - **Not enough storage.** Free at least about 400 MB; the APK is about 130 MB.
 - **Play Protect or an "unknown sources" prompt.** Choose *More details → Install anyway*, and allow installs from your browser or file manager.
+- **Generic "The app wasn't installed" from Files by Google:** open the APK from Chrome's *Downloads* or the system *Files* app instead. The system installer names the actual reason, such as "isn't compatible", "conflicts with an existing package" or "package appears to be invalid". Also check *Settings → Apps* (including Dual apps, Second space and Work profile) for a leftover copy.
 - **Still failing?** Connect the phone with USB debugging on and run `adb install -r emrtd-pid-wallet-debug.apk`. It prints the exact reason, for example `INSTALL_FAILED_NO_MATCHING_ABIS` or `INSTALL_FAILED_UPDATE_INCOMPATIBLE`.
 
 ## Presenting the PID

@@ -13,8 +13,8 @@ android {
         applicationId = "io.github.adhopte.emrtdwallet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.0.2"
         // Default issuer backend; can be changed at runtime in Settings.
         // Override at build time: ./gradlew assembleDebug -PissuerUrl=https://my-issuer.onrender.com
         // (http://10.0.2.2:8000 is the host machine when running in the Android emulator.)
@@ -33,6 +33,10 @@ android {
             storePassword = "emrtd-dev"
             keyAlias = "emrtd-dev"
             keyPassword = "emrtd-dev"
+            // Sign with every scheme so all Android versions/installers accept the APK
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
         }
     }
 
@@ -55,6 +59,11 @@ android {
         buildConfig = true
     }
     packaging {
+        // Compress native libraries and extract them at install time. Storing them uncompressed
+        // (the modern default) trips some OEM package installers and makes the APK much larger.
+        jniLibs {
+            useLegacyPackaging = true
+        }
         resources {
             excludes += setOf(
                 "/META-INF/{AL2.0,LGPL2.1}",
