@@ -79,8 +79,10 @@ fun PresentScreen(vm: MainViewModel, onClose: () -> Unit) {
                 is PresentationState.QrReady -> {
                     Text("Let the verifier scan this code", style = MaterialTheme.typography.titleMedium)
                     Image(s.qr.asImageBitmap(), "Device engagement QR code", Modifier.size(300.dp))
-                    Text("ISO/IEC 18013-5 device engagement over BLE. Keep Bluetooth on. " +
-                        "NFC readers can also engage by tapping the phone.",
+                    val tapHint = if (rememberNfcStatus() == NfcStatus.ENABLED) {
+                        " NFC readers can also engage by tapping the phone."
+                    } else ""
+                    Text("ISO/IEC 18013-5 device engagement over BLE. Keep Bluetooth on.$tapHint",
                         style = MaterialTheme.typography.bodySmall)
                 }
                 PresentationState.Connected -> {

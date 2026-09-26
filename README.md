@@ -123,7 +123,13 @@ Notes:
 
 ## Building the Android app
 
-Requirements: JDK 17+ and Android SDK 36. The minimum device version is Android 10 (API 29), and the phone needs NFC for the chip path.
+Requirements: JDK 17+ and Android SDK 36. The app runs on Android 10 (API 29) and later.
+
+**Phones without NFC** can install and use the app: NFC, camera, Bluetooth and location are all declared optional. What changes on those phones:
+- **Adding a PID:** image scan is offered as the main option. The chip option is shown disabled, with a note that it needs an NFC phone.
+- **NFC switched off:** the app offers a shortcut to NFC settings.
+- **Chip read problems:** the chip-read screen always offers "scan images instead", for phones without NFC and for chips that can't be read.
+- **Presenting:** QR/BLE proximity and OpenID4VP work without NFC. Only tap-to-engage needs it.
 
 ```bash
 cd android

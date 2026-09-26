@@ -49,6 +49,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -177,15 +179,37 @@ fun formatValue(v: Any?): String = when (v) {
 
 @Composable
 fun AddPidScreen(onChip: () -> Unit, onScan: () -> Unit, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val nfc = rememberNfcStatus()
     Scaffold(topBar = { SimpleTopBar("Add PID", onBack) }) { padding ->
         Column(Modifier.padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("How do you want to prove your identity?", style = MaterialTheme.typography.titleMedium)
+            if (nfc == NfcStatus.UNAVAILABLE) {
+                // Image scan first: it is the only path that works on this phone
+                OptionCard(
+                    icon = Icons.Filled.CameraAlt,
+                    title = "Scan your passport or ID card",
+                    body = "Photograph the data page (and the back of ID cards). The issuer checks image " +
+                        "authenticity and MRZ/VIZ consistency.",
+                    onClick = onScan,
+                )
+                OptionCard(
+                    icon = Icons.Filled.Nfc,
+                    title = "Read the document chip",
+                    body = "Not available: this phone has no NFC reader. Chip reading (highest assurance) " +
+                        "needs an NFC-capable phone.",
+                    enabled = false,
+                    onClick = {},
+                )
+                return@Column
+            }
             OptionCard(
                 icon = Icons.Filled.Nfc,
                 title = "Passport / ID card with chip",
                 body = "Scan the MRZ, then hold the document to the phone. The issuer verifies the chip " +
-                    "(Passive, Active and Chip Authentication). Highest assurance.",
-                onClick = onChip,
+                    "(Passive, Active and Chip Authentication). Highest assurance." +
+                    if (nfc == NfcStatus.DISABLED) "\nNFC is switched off — tap to turn it on." else "",
+                onClick = { if (nfc == NfcStatus.DISABLED) openNfcSettings(context) else onChip() },
             )
             OptionCard(
                 icon = Icons.Filled.CameraAlt,
@@ -199,8 +223,8 @@ fun AddPidScreen(onChip: () -> Unit, onScan: () -> Unit, onBack: () -> Unit) {
 }
 
 @Composable
-private fun OptionCard(icon: ImageVector, title: String, body: String, onClick: () -> Unit) {
-    Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+private fun OptionCard(icon: ImageVector, title: String, body: String, enabled: Boolean = true, onClick: () -> Unit) {
+    Card(Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.5f).clickable(enabled = enabled, onClick = onClick)) {
         Row(Modifier.padding(16.dp)) {
             Icon(icon, null, Modifier.size(36.dp), tint = MaterialTheme.colorScheme.primary)
             Column(Modifier.padding(start = 16.dp)) {

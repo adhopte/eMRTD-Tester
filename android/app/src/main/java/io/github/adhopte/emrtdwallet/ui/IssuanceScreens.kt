@@ -129,15 +129,16 @@ private fun ManualAccessKey(onMrz: (MrzKey) -> Unit, onCan: (String) -> Unit) {
 // ---------------------------------------------------------------------------
 
 @Composable
-fun NfcReadScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit) {
+fun NfcReadScreen(vm: MainViewModel, onDone: () -> Unit, onUseImageScan: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val activity = context as? Activity
     val adapter = remember { NfcAdapter.getDefaultAdapter(context) }
+    val nfc = rememberNfcStatus()
     val state by vm.issuance.collectAsState()
     val key by vm.accessKey.collectAsState()
 
-    DisposableEffect(activity, adapter) {
-        if (activity != null && adapter != null) {
+    DisposableEffect(activity, adapter, nfc) {
+        if (activity != null && adapter != null && nfc == NfcStatus.ENABLED) {
             val flags = NfcAdapter.FLAG_READER_NFC_A or NfcAdapter.FLAG_READER_NFC_B or NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK
             adapter.enableReaderMode(activity, { tag -> vm.onPassportTag(tag) }, flags, null)
         }
@@ -152,8 +153,18 @@ fun NfcReadScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             when {
-                adapter == null -> Text("This phone has no NFC reader. Use the document image option instead.")
-                !adapter.isEnabled -> Text("NFC is switched off. Enable it in the system settings.")
+                nfc == NfcStatus.UNAVAILABLE -> {
+                    Text("This phone has no NFC reader, so the document chip cannot be read.",
+                        style = MaterialTheme.typography.titleMedium)
+                    Button(onClick = onUseImageScan, modifier = Modifier.fillMaxWidth()) { Text("Scan document images instead") }
+                }
+                nfc == NfcStatus.DISABLED -> {
+                    Text("NFC is switched off.", style = MaterialTheme.typography.titleMedium)
+                    Button(onClick = { openNfcSettings(context) }, modifier = Modifier.fillMaxWidth()) { Text("Turn on NFC") }
+                    OutlinedButton(onClick = onUseImageScan, modifier = Modifier.fillMaxWidth()) {
+                        Text("Scan document images instead")
+                    }
+                }
                 else -> {
                     Icon(Icons.Filled.Nfc, null, Modifier.size(96.dp), tint = MaterialTheme.colorScheme.primary)
                     when (val s = state) {
@@ -165,6 +176,7 @@ fun NfcReadScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit) {
                         is IssuanceState.Failed -> {
                             Text(s.message, color = MaterialTheme.colorScheme.error)
                             Text("Hold the document to the phone again to retry.")
+                            OutlinedButton(onClick = onUseImageScan) { Text("Can't read the chip? Scan images instead") }
                         }
                         else -> {
                             Text("Hold the phone against the passport photo page or the ID card.",

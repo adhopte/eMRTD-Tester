@@ -58,7 +58,15 @@ fun AppNavigation(remoteRequest: Uri?, onRemoteRequestConsumed: () -> Unit) {
             MrzScreen(vm = vm, onContinue = { vm.resetIssuance(); nav.navigate(Routes.NFC) }, onBack = { nav.popBackStack() })
         }
         composable(Routes.NFC) {
-            NfcReadScreen(vm = vm, onDone = { nav.navigate(Routes.RESULT) }, onBack = { nav.popBackStack() })
+            NfcReadScreen(
+                vm = vm,
+                onDone = { nav.navigate(Routes.RESULT) },
+                onUseImageScan = {
+                    vm.resetIssuance()
+                    nav.navigate(Routes.SCAN) { popUpTo(Routes.ADD) }
+                },
+                onBack = { nav.popBackStack() },
+            )
         }
         composable(Routes.SCAN) {
             DocumentScanScreen(vm = vm, onDone = { nav.navigate(Routes.RESULT) }, onBack = { nav.popBackStack() })
