@@ -15,6 +15,17 @@ import io.github.adhopte.emrtdwallet.docscan.DocumentPdf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Switch
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import io.github.adhopte.emrtdwallet.docscan.AutoCaptureAnalyzer
+import io.github.adhopte.emrtdwallet.docscan.AutoCaptureStatus
+import io.github.adhopte.emrtdwallet.docscan.CaptureTarget
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
@@ -276,6 +287,44 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
 
     LaunchedEffect(state) { if (state is IssuanceState.Finished) onDone() }
 
+    val haptics = LocalHapticFeedback.current
+    var autoCapture by remember { mutableStateOf(true) }
+    var autoStatus by remember { mutableStateOf(AutoCaptureStatus.SEARCHING) }
+    var capturing by remember { mutableStateOf(false) }
+
+    fun takePicture() {
+        if (capturing) return
+        capturing = true
+        error = null
+        capture.takePicture(ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageCapturedCallback() {
+            override fun onCaptureSuccess(image: ImageProxy) {
+                val bytes = image.toJpegBytes()
+                image.close()
+                capturing = false
+                autoStatus = AutoCaptureStatus.SEARCHING
+                accept(bytes)
+            }
+
+            override fun onError(exception: ImageCaptureException) {
+                capturing = false
+                error = exception.message
+            }
+        })
+    }
+
+    // ID card front has no MRZ; passport pages and ID card backs are recognised by a valid MRZ
+    val target = if (needBack && front == null) CaptureTarget.CARD_FRONT else CaptureTarget.MRZ_PAGE
+    val analyzer = remember(target, autoCapture, ready) {
+        if (!autoCapture || ready) null else AutoCaptureAnalyzer(
+            target,
+            onStatus = { autoStatus = it },
+            onCapture = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                takePicture()
+            },
+        )
+    }
+
     Scaffold(topBar = { SimpleTopBar("Scan document", onBack) }) { padding ->
         Column(Modifier.padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -296,37 +345,40 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
                 val cameraAllowed = rememberCameraPermission()
                 Text(
                     when {
-                        capturingBack -> "Now the BACK of the card (with the MRZ): photograph it or upload an image."
-                        kind == "passport" -> "Photograph the passport photo page — fill the frame, avoid glare, " +
-                            "place it on a dark, plain surface — or upload an existing image."
-                        else -> "The FRONT of the ID card (with the portrait): photograph it or upload an image."
+                        capturingBack -> "Now the BACK of the card (with the MRZ). Hold it in the frame — it is " +
+                            "captured automatically — or capture/upload manually."
+                        kind == "passport" -> "Hold the passport photo page in the frame on a dark, plain surface, " +
+                            "avoiding glare. It is captured automatically once the MRZ is readable."
+                        else -> "Hold the FRONT of the ID card (with the portrait) in the frame. " +
+                            "It is captured automatically once the text is readable."
                     },
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 if (cameraAllowed) {
-                    Box(Modifier.fillMaxWidth().aspectRatio(0.75f)) { CameraPreview(Modifier.fillMaxSize(), imageCapture = capture) }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(checked = autoCapture, onCheckedChange = { autoCapture = it; autoStatus = AutoCaptureStatus.SEARCHING })
+                        Text("  Auto capture", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Box(Modifier.fillMaxWidth().aspectRatio(0.75f)) {
+                        CameraPreview(Modifier.fillMaxSize(), analyzer = analyzer, imageCapture = capture)
+                        if (autoCapture) AutoCaptureOverlay(autoStatus, target, capturing)
+                    }
                 } else {
                     Text("Camera permission not granted — you can still upload images.",
                         style = MaterialTheme.typography.bodySmall)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     if (cameraAllowed) {
-                        Button(onClick = {
-                            error = null
-                            capture.takePicture(ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageCapturedCallback() {
-                                override fun onCaptureSuccess(image: ImageProxy) {
-                                    val bytes = image.toJpegBytes()
-                                    image.close()
-                                    accept(bytes)
-                                }
-
-                                override fun onError(exception: ImageCaptureException) {
-                                    error = exception.message
-                                }
-                            })
-                        }, modifier = Modifier.weight(1f)) {
+                        Button(onClick = { takePicture() }, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Filled.PhotoCamera, null)
-                            Text(if (capturingBack) " Capture back" else " Capture", maxLines = 1)
+                            Text(
+                                when {
+                                    capturing -> " Capturing…"
+                                    capturingBack -> " Capture back"
+                                    else -> " Capture"
+                                },
+                                maxLines = 1,
+                            )
                         }
                     }
                 }
@@ -368,6 +420,32 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AutoCaptureOverlay(status: AutoCaptureStatus, target: CaptureTarget, capturing: Boolean) {
+    val (color, message) = when {
+        capturing || status == AutoCaptureStatus.CAPTURE -> Color(0xFF2E7D32) to "Captured"
+        status == AutoCaptureStatus.HOLD_STILL -> Color(0xFFF9A825) to "Hold still…"
+        status == AutoCaptureStatus.TOO_FAR -> Color.White to "Move closer — fill the frame"
+        status == AutoCaptureStatus.WRONG_SIDE -> Color(0xFFC62828) to "This is the back — show the FRONT first"
+        target == CaptureTarget.MRZ_PAGE -> Color.White to "Looking for the MRZ (<<< lines)…"
+        else -> Color.White to "Looking for the card front…"
+    }
+    Box(Modifier.fillMaxSize().padding(20.dp)) {
+        // Guide frame: ID-1 / passport page proportions in landscape within the portrait preview
+        Canvas(Modifier.fillMaxWidth().aspectRatio(1.42f).align(Alignment.Center)) {
+            drawRoundRect(color = color, style = Stroke(width = 4.dp.toPx()), cornerRadius = CornerRadius(12.dp.toPx()))
+        }
+        Text(
+            message,
+            color = Color.White,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.align(Alignment.BottomCenter)
+                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+        )
     }
 }
 

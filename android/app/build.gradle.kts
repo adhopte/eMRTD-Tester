@@ -13,8 +13,8 @@ android {
         applicationId = "io.github.adhopte.emrtdwallet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 4
+        versionName = "1.1.0"
         // Default issuer backend; can be changed at runtime in Settings.
         // Override at build time: ./gradlew assembleDebug -PissuerUrl=https://my-issuer.onrender.com
         // (http://10.0.2.2:8000 is the host machine when running in the Android emulator.)

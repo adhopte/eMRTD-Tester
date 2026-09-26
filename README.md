@@ -44,6 +44,12 @@ Only a chip that holds the DG14 private key can derive those session keys. That 
 - Set `PID_REQUIRE_CSCA_TRUST=true` to require that the DSC chains to an imported CSCA. It defaults to `false` so you can test with passports whose CSCA you haven't imported; the report then shows a warning.
 - The document must not be expired. Each session is single-use and expires after `PID_SESSION_TTL_SECONDS`.
 
+**Auto capture.** On by default in the scan screen. The app runs on-device OCR on the camera preview about 4 times a second and takes the photo itself when:
+- **Passport photo page or ID card back:** the MRZ is read with valid check digits.
+- **ID card front:** at least 5 lines of text span 45% or more of the frame and no MRZ is visible. If the MRZ side is shown, it prompts "show the FRONT first".
+
+In both cases the text must hold still over 3 consecutive analysed frames. A guide frame and status line show progress ("Move closer", "Hold still…", "Captured"). Manual capture and upload remain available.
+
 **Image path** (`backend/app/docscan/`). The app sends either a live camera capture or an image **uploaded** from the gallery or files (JPEG, PNG, WebP or HEIC, converted to upright JPEG on the phone), or a **PDF scan**. PDFs are rendered at 300 DPI, on the phone by Android's `PdfRenderer` or on the backend by `pypdfium2` for API clients that post a PDF directly. Page 1 is the front and page 2 the back; a single page with both sides of an ID card also works. Password-protected PDFs are rejected. Uploads are accepted but flagged: the report shows a `capture_source` warning, and the PID evidence records `image_source: upload`, because a stored file may have been edited. The server:
 - checks resolution, sharpness (Laplacian variance), glare and exposure
 - finds and rectifies the document, then compares its aspect ratio to ICAO TD1/TD2/TD3
