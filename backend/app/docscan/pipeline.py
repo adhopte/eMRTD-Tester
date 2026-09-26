@@ -223,6 +223,10 @@ def analyze(front: bytes, back: bytes | None, device_ocr_text: str, document_kin
     elif ratio >= 0.5:
         content.warn("viz_mrz_consistency", f"only {sum(matched.values())}/{len(matched)} VIZ fields match the MRZ",
                      {k: round(v, 2) for k, v in consistency.items()})
+    elif len(re.findall(r"[A-Z0-9]{3,}", viz_text.upper())) < 4:
+        # nothing legible outside the MRZ (OCR unavailable or timed out): cannot compare
+        content.warn("viz_mrz_consistency", "visual inspection zone text could not be read; not compared")
+        ratio = 0.5
     else:
         content.failed("viz_mrz_consistency", "visual inspection zone does not match the MRZ",
                        {k: round(v, 2) for k, v in consistency.items()})
