@@ -7,7 +7,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 # CSCA certificates / master lists used for Passive Authentication
 COPY data/csca ./data/csca
-# PKI: point PID_PKI_DIR at a persistent disk or a secrets mount (Render: /etc/secrets)
+# Committed TEST issuer PKI (see data/pki/README.md). For real keys, point PID_PKI_DIR at
+# a secrets mount (Render: /etc/secrets) or a persistent disk instead.
+COPY data/pki ./data/pki
 ENV PID_PKI_DIR=/srv/data/pki PID_CSCA_DIR=/srv/data/csca PORT=8000
 EXPOSE 8000
 # Single worker: issuance sessions (AA/CA challenges) are kept in memory

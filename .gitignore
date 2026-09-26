@@ -3,7 +3,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
-backend/data/pki/
 backend/.env
 
 # Android / Gradle

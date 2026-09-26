@@ -1,21 +1,26 @@
 # Render Blueprint: https://render.com/docs/blueprint-spec
+# Deploy: https://render.com/deploy?repo=https://github.com/adhopte/eMRTD-Tester
 services:
   - type: web
     name: emrtd-pid-issuer
     runtime: docker
-    rootDir: backend
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
-    plan: starter            # "free" works too, but sleeps after 15 min idle (see README)
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free                 # sleeps after 15 min idle; switch to "starter" for always-on
+    region: frankfurt
     healthCheckPath: /health
     autoDeploy: true
+    buildFilter:
+      paths:
+        - backend/**
+        - render.yaml
     envVars:
-      # Must equal the service's public URL; it is embedded in the IACA/DS certificates
+      # Public URL of the service; embedded in the committed test PKI (backend/data/pki)
       - key: PID_PUBLIC_BASE_URL
-        sync: false
-      # Upload iaca.key, iaca.pem, ds.key, ds.pem as Secret Files (see scripts/gen_pki.py)
+        value: https://emrtd-pid-issuer.onrender.com
+      # Committed TEST keys baked into the image. For real keys use /etc/secrets (Secret Files).
       - key: PID_PKI_DIR
-        value: /etc/secrets
+        value: /srv/data/pki
       - key: PID_ISSUER_COUNTRY
         value: EU
       - key: PID_REQUIRE_CSCA_TRUST
