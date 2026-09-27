@@ -35,6 +35,7 @@ from .pid import PID_DOCTYPE, PID_NAMESPACE, IdentityEvidence, build_namespaces,
 from .report import Section
 from .pki import IssuerPki, load_or_create
 from .sessions import SessionStore
+from . import wallet_provider
 
 log = logging.getLogger("pid-issuer")
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +47,7 @@ class State:
     csca: CscaStore
     sessions: SessionStore
     oid4vci: Oid4vciIssuer
+    wallet_provider: wallet_provider.WalletProvider
 
 
 state = State()
@@ -57,10 +59,12 @@ def init_state(settings: Settings | None = None) -> None:
     state.pki = load_or_create(s.pki_dir, s.issuer_country, s.issuer_organization, s.public_base_url)
     state.csca = CscaStore.from_directory(s.csca_dir)
     state.sessions = SessionStore(s.session_ttl_seconds)
+    state.wallet_provider = wallet_provider.load_or_create(s.pki_dir)
     state.oid4vci = Oid4vciIssuer(
         s.public_base_url, state.pki.ds_key, state.pki.ds_cert, issuing_authority=s.issuing_authority,
         issuing_country=state.pki.country, max_validity_days=s.pid_max_validity_days,
-        display_name=s.issuing_authority, offer_ttl=s.oid4vci_offer_ttl_seconds)
+        display_name=s.issuing_authority, offer_ttl=s.oid4vci_offer_ttl_seconds,
+        wallet_provider=state.wallet_provider)
 
 
 @asynccontextmanager
@@ -559,3 +563,32 @@ async def issuer_portal_offer(request: Request) -> HTMLResponse:
     holder = f"{ev.given_name} {ev.family_name}".strip()
     return HTMLResponse(portal.offer_page(offer.id, state.oid4vci.offer_uri(offer), offer.tx_code, names, holder,
                                           report))
+
+
+# ---------------------------------------------------------------------------
+# TEST Wallet Provider (key attestations for the wallet's device keys)
+# ---------------------------------------------------------------------------
+
+
+class KeyAttestationRequest(BaseModel):
+    keys: list[dict] = Field(description="public JWKs (EC P-256) of the device keys to attest")
+    nonce: str | None = Field(None, description="issuer c_nonce to bind, when the wallet has one")
+    android_attestation: list[list[str]] | None = Field(
+        None, description="per key, the Android Keystore attestation certificate chain (base64 DER)")
+    wallet_unit_id: str | None = None
+
+
+@app.post("/wallet-provider/key-attestation")
+def key_attestation(req: KeyAttestationRequest) -> dict:
+    try:
+        jwt = state.wallet_provider.key_attestation(req.keys, req.nonce)
+    except (ValueError, KeyError) as e:
+        raise HTTPException(400, f"cannot attest keys: {e}") from e
+    return {"key_attestation": jwt}
+
+
+@app.get("/wallet-provider/certificate.pem", include_in_schema=False)
+def wallet_provider_cert() -> Response:
+    from cryptography.hazmat.primitives import serialization
+
+    return Response(state.wallet_provider.cert.public_bytes(serialization.Encoding.PEM), media_type="application/x-pem-file")

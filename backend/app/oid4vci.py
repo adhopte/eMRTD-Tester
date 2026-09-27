@@ -36,6 +36,7 @@ from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from .attestations import CREDENTIAL_TYPES, IssueContext
 from .mdoc.issuer import build_issuer_signed
 from .pid import IdentityEvidence
+from .wallet_provider import WalletProvider, jwk_to_key
 
 PRE_AUTH_GRANT = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
 PROOF_TYP = "openid4vci-proof+jwt"
@@ -87,7 +88,9 @@ def b64u_dec(s: str) -> bytes:
 
 class Oid4vciIssuer:
     def __init__(self, issuer_id: str, ds_key, ds_cert, *, issuing_authority: str, issuing_country: str,
-                 max_validity_days: int, display_name: str, offer_ttl: int = 1800) -> None:
+                 max_validity_days: int, display_name: str, offer_ttl: int = 1800,
+                 wallet_provider: WalletProvider | None = None) -> None:
+        self.wallet_provider = wallet_provider
         self.issuer_id = issuer_id.rstrip("/")
         self.ds_key, self.ds_cert = ds_key, ds_cert
         self.issuing_authority, self.issuing_country = issuing_authority, issuing_country
@@ -220,27 +223,47 @@ class Oid4vciIssuer:
 
     # ------------------------------------------------------------------ credential
 
-    def _check_proof(self, jwt: str) -> dict:
-        """Verify a JWT key proof and return the holder key as a COSE_Key map."""
+    def _check_proof(self, jwt: str) -> list[dict]:
+        """Verify a JWT key proof; return the holder key(s) to bind, as COSE_Key maps.
+
+        Two forms are accepted: a ``jwk`` header (the proof key is the holder key) or a
+        ``key_attestation`` header from the trusted Wallet Provider (OpenID4VCI 1.0 Appendix D),
+        where the proof is signed by one of the attested keys and every attested key gets a
+        credential.
+        """
         try:
             h_b64, p_b64, s_b64 = jwt.split(".")
             header, payload = json.loads(b64u_dec(h_b64)), json.loads(b64u_dec(p_b64))
             sig = b64u_dec(s_b64)
-        except (ValueError, json.JSONDecodeError) as e:
+        except (ValueError, json.JSONDecodeError, AttributeError) as e:
             raise OAuthError(400, "invalid_proof", "proof is not a compact JWS") from e
         if header.get("typ") != PROOF_TYP:
             raise OAuthError(400, "invalid_proof", f"proof typ must be {PROOF_TYP}")
         if header.get("alg") != "ES256":
             raise OAuthError(400, "invalid_proof", "proof alg must be ES256")
-        jwk = header.get("jwk")
-        if not isinstance(jwk, dict) or jwk.get("kty") != "EC" or jwk.get("crv") != "P-256" or "d" in jwk:
-            raise OAuthError(400, "invalid_proof", "proof must carry a public EC P-256 jwk (kid/x5c not supported)")
+        if "key_attestation" in header:
+            if self.wallet_provider is None:
+                raise OAuthError(400, "invalid_proof", "key attestations are not accepted by this issuer")
+            try:
+                att = self.wallet_provider.verify_key_attestation(header["key_attestation"])
+            except (ValueError, KeyError, json.JSONDecodeError) as e:
+                raise OAuthError(400, "invalid_proof", f"key attestation rejected: {e}") from e
+            jwks = att["attested_keys"]
+            try:
+                idx = int(header.get("kid", 0))
+                signing_jwk = jwks[idx]
+            except (ValueError, IndexError) as e:
+                raise OAuthError(400, "invalid_proof", "proof kid does not reference an attested key") from e
+        else:
+            signing_jwk = header.get("jwk")
+            if not isinstance(signing_jwk, dict):
+                raise OAuthError(400, "invalid_proof", "proof needs a jwk or key_attestation header (kid/x5c not supported)")
+            jwks = [signing_jwk]
         try:
-            x, y = b64u_dec(jwk["x"]), b64u_dec(jwk["y"])
-            pub = ec.EllipticCurvePublicNumbers(int.from_bytes(x, "big"), int.from_bytes(y, "big"),
-                                                ec.SECP256R1()).public_key()
-        except (KeyError, ValueError) as e:
-            raise OAuthError(400, "invalid_proof", "invalid jwk") from e
+            pub = jwk_to_key(signing_jwk)
+            holder_keys = [jwk_to_key(j) for j in jwks]
+        except (KeyError, ValueError, TypeError) as e:
+            raise OAuthError(400, "invalid_proof", f"invalid key: {e}") from e
         if len(sig) != 64:
             raise OAuthError(400, "invalid_proof", "ES256 signature must be 64 bytes")
         der = encode_dss_signature(int.from_bytes(sig[:32], "big"), int.from_bytes(sig[32:], "big"))
@@ -258,7 +281,11 @@ class Oid4vciIssuer:
             self._purge()
             if payload.get("nonce") not in self._nonces:
                 raise OAuthError(400, "invalid_nonce", "proof nonce is missing, unknown or expired")
-        return {1: 2, -1: 1, -2: x.rjust(32, b"\0"), -3: y.rjust(32, b"\0")}
+        out = []
+        for k in holder_keys:
+            n = k.public_numbers()
+            out.append({1: 2, -1: 1, -2: n.x.to_bytes(32, "big"), -3: n.y.to_bytes(32, "big")})
+        return out
 
     def credential(self, authorization: str | None, body: dict) -> dict:
         scheme, _, token = (authorization or "").partition(" ")
@@ -284,7 +311,11 @@ class Oid4vciIssuer:
             raise OAuthError(400, "invalid_proof", "a jwt proof is required (proofs.jwt)")
         if len(jwts) > 10:
             raise OAuthError(400, "invalid_proof", "at most 10 proofs per request")
-        keys = [self._check_proof(j) for j in jwts]
+        keys: list[dict] = []
+        for j in jwts:
+            for k in self._check_proof(j):
+                if k not in keys:
+                    keys.append(k)
 
         ctype = CREDENTIAL_TYPES[config_id]
         now = dt.datetime.now(dt.timezone.utc)

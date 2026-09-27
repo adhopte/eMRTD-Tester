@@ -163,3 +163,53 @@ def test_portal_pages(client):
     r = client.post("/issuer/offer", data=form)
     assert r.status_code == 200, r.text
     assert "<svg" in r.text and "openid-credential-offer://" in r.text
+
+
+def jwk_of(key: ec.EllipticCurvePrivateKey) -> dict:
+    n = key.public_key().public_numbers()
+    return {"kty": "EC", "crv": "P-256", "x": b64u(n.x.to_bytes(32, "big")), "y": b64u(n.y.to_bytes(32, "big"))}
+
+
+def attested_proof(signing_key, kid: int, attestation: str, nonce: str) -> str:
+    header = b64u(json.dumps({"typ": "openid4vci-proof+jwt", "alg": "ES256", "kid": str(kid),
+                              "key_attestation": attestation}).encode())
+    payload = b64u(json.dumps({"aud": ISSUER, "iat": int(time.time()), "nonce": nonce}).encode())
+    r, s = decode_dss_signature(signing_key.sign(f"{header}.{payload}".encode(), ec.ECDSA(hashes.SHA256())))
+    return f"{header}.{payload}.{b64u(r.to_bytes(32, 'big') + s.to_bytes(32, 'big'))}"
+
+
+def test_key_attestation_proofs(client, offer):
+    """EUDI wallet-core style: the proof carries a Wallet Provider key attestation (WUA) and every
+    attested key receives a credential."""
+    doc = resolve(client, offer["credential_offer_uri"])
+    access = token(client, doc, offer["tx_code"]).json()["access_token"]
+    nonce = client.post("/oid4vci/nonce").json()["c_nonce"]
+    keys = [ec.generate_private_key(ec.SECP256R1()) for _ in range(2)]
+    att = client.post("/wallet-provider/key-attestation",
+                      json={"keys": [jwk_of(k) for k in keys], "nonce": nonce}).json()["key_attestation"]
+    r = client.post("/oid4vci/credential", headers={"Authorization": f"Bearer {access}"},
+                    json={"credential_configuration_id": "eu.europa.ec.eudi.pid_mso_mdoc",
+                          "proofs": {"jwt": [attested_proof(keys[1], 1, att, nonce)]}})
+    assert r.status_code == 200, r.text
+    creds = r.json()["credentials"]
+    assert len(creds) == 2
+    for k, c in zip(keys, creds):
+        raw = base64.urlsafe_b64decode(c["credential"] + "=" * (-len(c["credential"]) % 4))
+        out = verify_issuer_signed(raw, [main.state.pki.iaca_cert], "eu.europa.ec.eudi.pid.1")
+        assert out["device_key"][-2] == k.public_key().public_numbers().x.to_bytes(32, "big")
+
+    # a proof signed by a key that is not the referenced attested key fails
+    other = ec.generate_private_key(ec.SECP256R1())
+    r = client.post("/oid4vci/credential", headers={"Authorization": f"Bearer {access}"},
+                    json={"credential_configuration_id": "eu.europa.ec.av.1",
+                          "proofs": {"jwt": [attested_proof(other, 0, att, nonce)]}})
+    assert r.status_code == 400 and r.json()["error"] == "invalid_proof"
+    # an attestation from anyone but the trusted Wallet Provider fails
+    from app.wallet_provider import WalletProvider, load_or_create
+    import tempfile
+    rogue: WalletProvider = load_or_create(tempfile.mkdtemp())
+    fake = rogue.key_attestation([jwk_of(keys[0])], nonce)
+    r = client.post("/oid4vci/credential", headers={"Authorization": f"Bearer {access}"},
+                    json={"credential_configuration_id": "eu.europa.ec.av.1",
+                          "proofs": {"jwt": [attested_proof(keys[0], 0, fake, nonce)]}})
+    assert r.status_code == 400 and "key attestation rejected" in r.json()["error_description"]
