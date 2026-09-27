@@ -61,6 +61,7 @@ def test_metadata(client):
     pid = md["credential_configurations_supported"]["eu.europa.ec.eudi.pid_mso_mdoc"]
     assert pid["format"] == "mso_mdoc" and pid["doctype"] == "eu.europa.ec.eudi.pid.1"
     assert pid["credential_signing_alg_values_supported"] == [-7]
+    assert pid["proof_types_supported"]["jwt"]["key_attestations_required"] == {}
     assert {"org.iso.23220.photoID.1", "eu.europa.ec.av.1"} <= set(md["credential_configurations_supported"])
     asm = client.get("/.well-known/oauth-authorization-server").json()
     assert asm["token_endpoint"] == f"{ISSUER}/oid4vci/token"

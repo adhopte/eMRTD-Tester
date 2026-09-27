@@ -114,7 +114,10 @@ class Oid4vciIssuer:
                 "scope": t.config_id,
                 "cryptographic_binding_methods_supported": ["cose_key"],
                 "credential_signing_alg_values_supported": [-7],
-                "proof_types_supported": {"jwt": {"proof_signing_alg_values_supported": ["ES256"]}},
+                # Wallet Provider key attestation expected in the proof (OpenID4VCI 1.0 Appendix D);
+                # an empty object sets no key-storage / user-authentication level
+                "proof_types_supported": {"jwt": {"proof_signing_alg_values_supported": ["ES256"],
+                                                  "key_attestations_required": {}}},
                 "credential_metadata": {
                     "display": [{
                         "name": t.name, "locale": "en", "description": t.description,
