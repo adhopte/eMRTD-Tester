@@ -224,10 +224,10 @@ class VirtualPassport:
 
 
 def make_passport(*, aa="rsa", ca=True, pki: TestPki | None = None, mrz: str | None = None,
-                  ca_cipher_suffix="1") -> VirtualPassport:
+                  ca_cipher_suffix="1", face: bytes | None = None) -> VirtualPassport:
     pki = pki or make_pki()
     mrz = mrz or td3_mrz()
-    dgs = {1: make_dg1(mrz), 2: make_dg2(face_jpeg()), 11: make_dg11()}
+    dgs = {1: make_dg1(mrz), 2: make_dg2(face or face_jpeg()), 11: make_dg11()}
     ca_key = None
     aa_key = None
     if ca:

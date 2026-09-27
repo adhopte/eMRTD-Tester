@@ -22,7 +22,8 @@ def device_key() -> tuple[ec.EllipticCurvePrivateKey, str]:
     return k, b64(cbor2.dumps(ec_to_cose_key(k.public_key())))
 
 
-def run_flow(client, passport: f.VirtualPassport, *, tamper_aa=False, skip_ca=False, cipher=("3DES", 16)):
+def run_flow(client, passport: f.VirtualPassport, *, tamper_aa=False, skip_ca=False, cipher=("3DES", 16),
+             extra: dict | None = None):
     ch = client.post("/api/v1/emrtd/challenge",
                      json={"dg14": b64(passport.dgs[14]) if 14 in passport.dgs else None}).json()
     challenge = bytes.fromhex(ch["aa_challenge"])
@@ -41,6 +42,7 @@ def run_flow(client, passport: f.VirtualPassport, *, tamper_aa=False, skip_ca=Fa
         "chip_auth_response": b64(ca_resp) if ca_resp else None,
         "access_control": "PACE",
         "device_key": dk,
+        **(extra or {}),
     }
     return client.post("/api/v1/emrtd/issue", json=body).json()
 
@@ -139,3 +141,43 @@ def test_session_single_use(client):
 def test_pki_endpoints(client):
     assert b"BEGIN CERTIFICATE" in client.get("/pki/iaca.pem").content
     assert client.get("/pki/crl.der").status_code == 200
+
+
+def test_attestation_offer_carries_dtc(client):
+    """After a chip issuance the app gets an offer for the attestations; the photo ID carries the
+    eMRTD DTC namespace (EF.SOD + DG1 + DG2) so verifiers can re-run Passive Authentication."""
+    from tests.test_oid4vci import proof, resolve, token
+
+    p = f.make_passport(aa="rsa", ca=True)
+    res = run_flow(client, p)
+    offer = res["attestation_offer"]
+    assert [c["id"] for c in offer["credentials"]] == ["org.iso.23220.photoID.1", "eu.europa.ec.av.1"]
+    doc = resolve(client, offer["uri"])
+    access = token(client, doc, None).json()["access_token"]
+    nonce = client.post("/oid4vci/nonce").json()["c_nonce"]
+    k = ec.generate_private_key(ec.SECP256R1())
+    r = client.post("/oid4vci/credential", headers={"Authorization": f"Bearer {access}"},
+                    json={"credential_configuration_id": "org.iso.23220.photoID.1", "proofs": {"jwt": [proof(k, nonce)]}})
+    cred = r.json()["credentials"][0]["credential"]
+    out = verify_issuer_signed(base64.urlsafe_b64decode(cred + "=" * (-len(cred) % 4)), [main.state.pki.iaca_cert])
+    dtc = out["claims"]["org.iso.23220.dtc.1"]
+    assert dtc["dtc_sod"] == p.sod and dtc["dtc_dg1"] == p.dgs[1] and dtc["dtc_dg2"] == p.dgs[2]
+
+
+def test_selfie_checked_against_chip_portrait(client):
+    from app import face
+
+    if not face.engine("data/models").available():
+        pytest.skip("face models not downloaded")
+    selfie = open("tests/fixtures/face_public_domain.jpg", "rb").read()
+    p = f.make_passport(aa="rsa", ca=True, face=selfie)
+    # a selfie without the head-turn frames: face matches, but liveness is not proven
+    res = run_flow(client, p, extra={"selfie": b64(selfie)})
+    assert res["decision"] == "rejected"
+    bio = next(s for s in res["report"] if s["name"] == "biometrics")
+    assert {c["name"]: c["status"] for c in bio["checks"]}["face_match"] == "pass"
+    assert "liveness check not completed" in res["reasons"]
+    # a selfie of nobody -> rejected
+    blank = f.face_jpeg()
+    res = run_flow(client, p, extra={"selfie": b64(blank)})
+    assert res["decision"] == "rejected" and "credential" not in res

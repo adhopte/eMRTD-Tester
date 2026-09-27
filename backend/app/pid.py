@@ -39,6 +39,8 @@ class IdentityEvidence:
     portrait_jpeg: bytes | None = None
     evidence_type: str = "emrtd_chip"  # or "document_image"
     evidence_checks: dict[str, Any] = field(default_factory=dict)
+    # raw eMRTD objects (EF.SOD, DG1, DG2) for the DTC namespace of the photo ID attestation
+    raw_lds: dict[str, bytes] | None = None
 
 
 def _age(birth: dt.date, today: dt.date) -> int:

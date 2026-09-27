@@ -26,6 +26,16 @@ class Settings(BaseSettings):
     require_chip_genuineness: bool = True
     session_ttl_seconds: int = 300
 
+    # --- Selfie / face match ---
+    model_dir: str = "data/models"
+    # Reject issuance requests that come without a selfie (older app versions send none)
+    require_selfie: bool = False
+
+    # --- OpenID4VCI (pre-authorized code) ---
+    oid4vci_offer_ttl_seconds: int = 1800
+    # Let the web portal issue credentials from typed-in (unverified) test data
+    oid4vci_allow_manual_entry: bool = True
+
     # --- Document image policy ---
     scan_min_score: float = 0.75
     scan_allow_specimen: bool = False

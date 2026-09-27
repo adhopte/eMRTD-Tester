@@ -16,3 +16,6 @@ captures/
 *.apk
 *.aab
 dist/
+
+# Face models (downloaded by backend/scripts/fetch_models.sh)
+backend/data/models/

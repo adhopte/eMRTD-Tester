@@ -13,7 +13,8 @@ def client(tmp_path):
     from app import main
     from app.config import Settings
 
-    settings = Settings(pki_dir=str(tmp_path / "pki"), csca_dir=str(tmp_path / "csca"), require_csca_trust=False)
+    settings = Settings(pki_dir=str(tmp_path / "pki"), csca_dir=str(tmp_path / "csca"), require_csca_trust=False,
+                        public_base_url="http://testserver")
     main.init_state(settings)
     with TestClient(main.app) as c:
         yield c

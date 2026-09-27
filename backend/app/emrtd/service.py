@@ -170,6 +170,8 @@ def verify_emrtd(
             "active_auth": aa_ok,
             "chip_auth": ca_ok,
         })
+        evidence.raw_lds = {"sod": sod_bytes, "dg1": data_groups[1],
+                            **({"dg2": data_groups[2]} if 2 in data_groups else {})}
     except ValueError as e:
         reasons.append(str(e))
     decision = "accepted" if not reasons and evidence else "rejected"
