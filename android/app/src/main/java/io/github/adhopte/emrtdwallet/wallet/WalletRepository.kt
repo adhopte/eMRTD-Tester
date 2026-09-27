@@ -8,9 +8,12 @@ import eu.europa.ec.eudi.wallet.document.IssuedDocument
 import eu.europa.ec.eudi.wallet.document.UnsignedDocument
 import eu.europa.ec.eudi.wallet.document.credential.IssuerProvidedCredential
 import eu.europa.ec.eudi.wallet.document.format.MsoMdocFormat
+import io.github.adhopte.emrtdwallet.data.ActivityLog
+import io.github.adhopte.emrtdwallet.data.ActivityType
 import io.github.adhopte.emrtdwallet.data.EmrtdIssueRequest
 import io.github.adhopte.emrtdwallet.data.IssueResponse
 import io.github.adhopte.emrtdwallet.data.IssuerApi
+import io.github.adhopte.emrtdwallet.data.SelfieUpload
 import io.github.adhopte.emrtdwallet.data.b64
 import io.github.adhopte.emrtdwallet.data.b64url
 import io.github.adhopte.emrtdwallet.emrtd.ChipReadResult
@@ -28,10 +31,11 @@ const val PID_NAMESPACE = "eu.europa.ec.eudi.pid.1"
 /** Outcome of an issuance attempt: the verification report and, if accepted, the stored PID. */
 data class IssuanceOutcome(val response: IssueResponse, val document: IssuedDocument?)
 
-class WalletRepository(context: Context, val wallet: EudiWallet, val api: IssuerApi) {
+class WalletRepository(context: Context, val wallet: EudiWallet, val api: IssuerApi, val activity: ActivityLog) {
 
     val passportReader = PassportReader(api)
-    val presentation = PresentationController(context, wallet)
+    val presentation = PresentationController(context, wallet, activity)
+    val offers = OfferController(wallet, activity) { refresh() }
 
     private val _documents = MutableStateFlow<List<IssuedDocument>>(emptyList())
     val documents: StateFlow<List<IssuedDocument>> = _documents.asStateFlow()
@@ -47,7 +51,9 @@ class WalletRepository(context: Context, val wallet: EudiWallet, val api: Issuer
     fun document(id: String): IssuedDocument? = wallet.getDocumentById(id) as? IssuedDocument
 
     fun delete(id: String) {
+        val name = document(id)?.name
         wallet.deleteDocumentById(id)
+        activity.add(ActivityType.DELETED, "Deleted ${name ?: "document"}", "The credential and its device key were removed")
         refresh()
     }
 
@@ -62,7 +68,7 @@ class WalletRepository(context: Context, val wallet: EudiWallet, val api: Issuer
         return wallet.createDocument(MsoMdocFormat(PID_DOCTYPE), settings, null).getOrThrow().also { it.name = name }
     }
 
-    suspend fun issueFromChip(read: ChipReadResult): IssuanceOutcome = issue("PID (eMRTD chip)") { deviceKey ->
+    suspend fun issueFromChip(read: ChipReadResult, selfie: SelfieUpload?): IssuanceOutcome = issue("PID (eMRTD chip)") { deviceKey ->
         api.issueFromEmrtd(
             EmrtdIssueRequest(
                 session_id = read.sessionId,
@@ -72,6 +78,9 @@ class WalletRepository(context: Context, val wallet: EudiWallet, val api: Issuer
                 chip_auth_response = read.chipAuthResponse?.b64(),
                 access_control = read.accessControl,
                 device_key = deviceKey.b64(),
+                selfie = selfie?.selfie?.b64(),
+                liveness_frames = selfie?.let { mapOf("turn_left" to it.turnLeft.b64(), "turn_right" to it.turnRight.b64()) },
+                liveness_report = selfie?.report,
             )
         )
     }
@@ -82,8 +91,9 @@ class WalletRepository(context: Context, val wallet: EudiWallet, val api: Issuer
         ocrText: String,
         kind: String,
         uploaded: Boolean,
+        selfie: SelfieUpload?,
     ): IssuanceOutcome = issue("PID (document scan)") { deviceKey ->
-        api.issueFromImages(front, back, ocrText, kind, if (uploaded) "upload" else "camera", deviceKey)
+        api.issueFromImages(front, back, ocrText, kind, if (uploaded) "upload" else "camera", deviceKey, selfie)
     }
 
     private suspend fun issue(name: String, call: suspend (ByteArray) -> IssueResponse): IssuanceOutcome {
@@ -95,6 +105,8 @@ class WalletRepository(context: Context, val wallet: EudiWallet, val api: Issuer
             val credential = response.credential
             if (response.decision != "accepted" || credential == null) {
                 wallet.deleteDocumentById(unsigned.id)
+                activity.add(ActivityType.ISSUANCE_REJECTED, "PID not issued", response.reasons.joinToString("\n"),
+                    "IN Groupe Issuer")
                 return IssuanceOutcome(response, null)
             }
             val issued = withContext(Dispatchers.IO) {
@@ -104,9 +116,12 @@ class WalletRepository(context: Context, val wallet: EudiWallet, val api: Issuer
                 ).getOrThrow()
             }
             refresh()
+            activity.add(ActivityType.ISSUED, "Added Person Identification Data", name, "IN Groupe Issuer",
+                listOf("Person Identification Data"))
             return IssuanceOutcome(response, issued)
         } catch (e: Throwable) {
             runCatching { wallet.deleteDocumentById(unsigned.id) }
+            activity.add(ActivityType.ISSUANCE_FAILED, "PID issuance failed", e.message ?: e.toString(), "IN Groupe Issuer")
             throw e
         }
     }

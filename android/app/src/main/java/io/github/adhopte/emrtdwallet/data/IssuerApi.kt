@@ -51,7 +51,13 @@ data class EmrtdIssueRequest(
     val chip_auth_response: String? = null,
     val access_control: String? = null,
     val device_key: String,
+    val selfie: String? = null,
+    val liveness_frames: Map<String, String>? = null,
+    val liveness_report: JsonObject? = null,
 )
+
+/** Selfie frames for the issuer's face match against the document portrait + liveness re-check. */
+class SelfieUpload(val selfie: ByteArray, val turnLeft: ByteArray, val turnRight: ByteArray, val report: JsonObject)
 
 @Serializable
 data class Credential(
@@ -70,12 +76,19 @@ data class ReportCheck(val name: String, val status: String, val detail: String 
 data class ReportSection(val name: String, val status: String, val checks: List<ReportCheck>)
 
 @Serializable
+data class OfferedCredential(val id: String, val name: String)
+
+@Serializable
+data class AttestationOffer(val uri: String, val credentials: List<OfferedCredential> = emptyList())
+
+@Serializable
 data class IssueResponse(
     val decision: String,
     val reasons: List<String> = emptyList(),
     val score: Double? = null,
     val report: List<ReportSection> = emptyList(),
     val credential: Credential? = null,
+    val attestation_offer: AttestationOffer? = null,
 )
 
 class IssuerException(message: String) : IOException(message)
@@ -86,7 +99,7 @@ class IssuerApi(private val baseUrl: () -> String) {
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(150, TimeUnit.SECONDS)
         .build()
     private val jsonType = "application/json".toMediaType()
 
@@ -101,6 +114,11 @@ class IssuerApi(private val baseUrl: () -> String) {
         post("/api/v1/emrtd/challenge", json.encodeToString(ChallengeRequest.serializer(), ChallengeRequest(dg14?.b64())))
             .let { json.decodeFromString(ChallengeResponse.serializer(), it) }
 
+    /** TEST Wallet Provider: key attestation (WUA) for the given device keys. */
+    suspend fun keyAttestation(body: JsonObject): String =
+        post("/wallet-provider/key-attestation", body.toString())
+            .let { (json.parseToJsonElement(it) as JsonObject)["key_attestation"]!!.toString().trim('"') }
+
     suspend fun issueFromEmrtd(req: EmrtdIssueRequest): IssueResponse =
         post("/api/v1/emrtd/issue", json.encodeToString(EmrtdIssueRequest.serializer(), req))
             .let { json.decodeFromString(IssueResponse.serializer(), it) }
@@ -112,6 +130,7 @@ class IssuerApi(private val baseUrl: () -> String) {
         documentKind: String,
         imageSource: String,
         deviceKey: ByteArray,
+        selfie: SelfieUpload?,
     ): IssueResponse = withContext(Dispatchers.IO) {
         val jpeg = "image/jpeg".toMediaType()
         val body = MultipartBody.Builder().setType(MultipartBody.FORM)
@@ -121,6 +140,14 @@ class IssuerApi(private val baseUrl: () -> String) {
             .addFormDataPart("document_kind", documentKind)
             .addFormDataPart("image_source", imageSource)
             .addFormDataPart("device_key", deviceKey.b64())
+            .apply {
+                if (selfie != null) {
+                    addFormDataPart("selfie", "selfie.jpg", selfie.selfie.toRequestBody(jpeg))
+                    addFormDataPart("liveness_left", "left.jpg", selfie.turnLeft.toRequestBody(jpeg))
+                    addFormDataPart("liveness_right", "right.jpg", selfie.turnRight.toRequestBody(jpeg))
+                    addFormDataPart("liveness_report", selfie.report.toString())
+                }
+            }
             .build()
         val text = execute(Request.Builder().url(baseUrl() + "/api/v1/document/issue").post(body).build())
         json.decodeFromString(IssueResponse.serializer(), text)

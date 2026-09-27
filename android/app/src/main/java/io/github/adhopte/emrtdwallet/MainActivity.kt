@@ -3,21 +3,28 @@ package io.github.adhopte.emrtdwallet
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.fragment.app.FragmentActivity
 import io.github.adhopte.emrtdwallet.ui.AppNavigation
 import io.github.adhopte.emrtdwallet.ui.WalletTheme
+import io.github.adhopte.emrtdwallet.wallet.OfferController
 
-class MainActivity : ComponentActivity() {
+/** A link that opened the wallet: a presentation request or a credential offer. */
+sealed interface IncomingLink {
+    data class Presentation(val uri: Uri) : IncomingLink
+    data class CredentialOffer(val uri: String) : IncomingLink
+}
+
+// FragmentActivity: required by BiometricPrompt
+class MainActivity : FragmentActivity() {
 
     private val app get() = application as WalletApp
 
-    /** A presentation request (OpenID4VP / ISO 18013-7) that arrived via deep link. */
-    private var pendingRemoteRequest by mutableStateOf<Uri?>(null)
+    private var pendingLink by mutableStateOf<IncomingLink?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,8 +33,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             WalletTheme {
                 AppNavigation(
-                    remoteRequest = pendingRemoteRequest,
-                    onRemoteRequestConsumed = { pendingRemoteRequest = null },
+                    incoming = pendingLink,
+                    onIncomingConsumed = { pendingLink = null },
                 )
             }
         }
@@ -36,6 +43,16 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleIntent(intent)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        app.lock.onForeground()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) app.lock.onBackground()
     }
 
     override fun onResume() {
@@ -51,14 +68,18 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         val uri = intent?.data ?: return
-        if (uri.scheme in REMOTE_SCHEMES) {
-            pendingRemoteRequest = uri
-            setIntent(Intent())
+        val text = uri.toString()
+        when {
+            // OpenID4VCI authorization code flow: the browser returns to the wallet
+            text.startsWith(OfferController.AUTH_REDIRECT) -> app.repository.offers.resumeAuthorization(uri)
+            OfferController.isCredentialOffer(text) -> pendingLink = IncomingLink.CredentialOffer(text)
+            uri.scheme in REMOTE_SCHEMES -> pendingLink = IncomingLink.Presentation(uri)
+            else -> return
         }
+        setIntent(Intent())
     }
 
-    private companion object {
+    companion object {
         val REMOTE_SCHEMES = setOf("openid4vp", "eudi-openid4vp", "mdoc-openid4vp", "haip-vp", "mdoc")
     }
 }
-

@@ -2,6 +2,8 @@
 
 An Android wallet app plus a backend that turns a passport or ID card into an **EU Person Identification Data (PID)** credential in **ISO/IEC 18013-5 mdoc** format (`eu.europa.ec.eudi.pid.1`). The PID is signed by a dummy "citizen PKI" issuer. You can present it to EU wallet **web verifiers** (OpenID4VP) and to **proximity verifiers** (ISO 18013-5 over QR/NFC engagement and BLE).
 
+The wallet also receives **attestations** (ISO 23220 Photo ID with portrait, EU age verification) and PIDs from **QR-code credential offers** (OpenID4VCI pre-authorized code flow). Every onboarding ends with a **live selfie**: the issuer matches it against the chip or document portrait and checks a head-turn liveness challenge. The wallet is protected by a **wallet PIN or the phone's biometrics**, chosen when the wallet is set up, and keeps a local **activity history**.
+
 You can onboard in one of two ways:
 
 | Path | For | What gets verified | Assurance |
@@ -59,6 +61,73 @@ In both cases the text must hold still over 3 consecutive analysed frames. A gui
 - checks expiry and SPECIMEN marks
 
 This produces a weighted score. A PID is issued only if nothing fails and the score is at least `PID_SCAN_MIN_SCORE`. `docscan/providers.py` is the hook for a commercial document-authenticity service (UV/IR, holograms, template databases), which you need for real assurance.
+
+## Selfie: face match and liveness
+
+After the chip read or the document capture, the app asks for a live selfie (`ui/SelfieScreen.kt`, `liveness/LivenessAnalyzer.kt`):
+
+1. ML Kit face detection on the front camera guides the user through a random order of challenges: blink, turn the head to one side, then the other, and finally look straight at the camera.
+2. One frame is kept per pose: the frontal selfie plus the two head-turn frames. They go to the issuer with the issuance request, along with a report of the challenges.
+3. The backend (`backend/app/face.py`) uses OpenCV **YuNet** (detection) and **SFace** (recognition):
+   - **Face match:** the selfie must match the DG2 portrait (chip) or the portrait cropped from the document image. The SFace cosine similarity must be at least 0.363, OpenCV's recommended threshold.
+   - **Liveness re-check:** both head-turn frames must show the same person as the selfie, turned clearly in *opposite* directions (estimated from the facial landmarks), while the selfie is frontal.
+4. A failed match or liveness check rejects the issuance. The result is recorded in the PID's evidence namespace (`face_match`, `face_match_score`, `liveness`).
+
+A printed photo or a static screen can't turn its head, but this is **not a certified presentation-attack detection** (ISO/IEC 30107-3): a replayed video of the holder could pass. The models (Apache-2.0) are downloaded with checksum verification when the Docker image is built (`backend/scripts/fetch_models.sh`). `PID_REQUIRE_SELFIE=true` makes the selfie mandatory; it defaults to `false` so older app versions keep working, and the app offers a "Skip" link that is recorded as `face_match: not_performed`.
+
+## Credential offers (OpenID4VCI), attestations and the issuer portal
+
+The backend is also an **OpenID4VCI 1.0** issuer (`backend/app/oid4vci.py`) for the **pre-authorized code flow**:
+
+| Endpoint | Purpose |
+|---|---|
+| `/.well-known/openid-credential-issuer`, `/.well-known/oauth-authorization-server` | issuer and authorization-server metadata |
+| `/oid4vci/offers/{id}` | the credential offer behind `openid-credential-offer://?credential_offer_uri=…` |
+| `/oid4vci/token` | pre-authorized code + 6-digit **transaction code** (5 wrong codes revoke the offer) |
+| `/oid4vci/nonce`, `/oid4vci/credential` | `c_nonce`, then `mso_mdoc` credentials bound to the proof key |
+| `/wallet-provider/key-attestation` | **TEST Wallet Provider**: signs `key-attestation+jwt` for the wallet's device keys |
+
+Credential types (`backend/app/attestations.py`), all ISO 18013-5 mdocs signed by the same Document Signer:
+- **PID** (`eu.europa.ec.eudi.pid.1`), with portrait.
+- **Photo ID** (`org.iso.23220.photoID.1`), with portrait. When issued from a chip it also carries the ICAO **DTC** namespace (`org.iso.23220.dtc.1`) with the chip's EF.SOD, DG1 and DG2, so a verifier can re-run Passive Authentication itself.
+- **Age verification** (`eu.europa.ec.av.1`), with age-over flags only: no name, no photo.
+
+How offers are created:
+- **In the app:** after a PID is issued, the result screen offers the Photo ID and age attestations derived from the same verified evidence. There is no transaction code, because the app is already on the authenticated channel.
+- **Web issuer portal:** `https://<backend>/issuer`.
+  1. Upload a passport or ID-card photo or PDF. It goes through the same document checks as the app. For testing, you can instead type self-asserted data; those credentials are marked `manual_entry_unverified`.
+  2. Pick the credentials to offer.
+  3. You get a QR code, the transaction code and a live status ("wallet connected", "delivered").
+- **API:** `POST /api/v1/oid4vci/offers`.
+
+About the proofs: EUDI wallet-core only sends JWT proofs that carry a Wallet Provider **key attestation** (OpenID4VCI 1.0 Appendix D, the ARF Wallet Unit Attestation). The backend therefore includes a TEST Wallet Provider (`backend/app/wallet_provider.py`, key in `data/pki/wallet_provider.*`). The issuer accepts proofs signed by an attested key and issues one credential per attested key. Plain `jwk` proofs from other wallets are accepted too. DPoP and credential-response encryption are not offered; the app encrypts responses whenever an issuer supports it.
+
+In the app, **Scan** (bottom bar) reads any wallet QR code:
+- A credential offer opens *Add to wallet*: issuer, offered credentials, and the transaction-code field if one is needed.
+- An OpenID4VP request opens the consent screen.
+- *Paste a link* covers links received by e-mail or chat.
+- Offers from other OpenID4VCI issuers work too, as long as they accept a public client and don't require their own wallet attestation.
+
+`android/app/src/test/.../Oid4vciEndToEndTest.kt` runs wallet-core's own `OpenId4VciManager` against a live backend: offer, transaction code, key attestation, three credentials stored.
+
+```bash
+./gradlew :app:testDebugUnitTest --tests '*Oid4vciEndToEnd*' -Pe2eIssuer=https://emrtd-pid-issuer.onrender.com
+```
+
+## Wallet security and activity
+
+- **Wallet unit initialisation.** After the tutorial, the user picks one of two unlock methods (`security/WalletLock.kt`):
+  - **Biometrics:** BiometricPrompt with the phone's fingerprint or face unlock, falling back to the screen lock.
+  - **Wallet PIN:** 6 digits, stored only as a salted PBKDF2-SHA256 hash. Trivial PINs are refused, and repeated failures back off exponentially.
+- **Locking.** The wallet locks on start and after one minute in the background.
+- **Confirmation.** Sharing data, deleting a credential and changing the unlock method all ask for the PIN or biometrics. Confirm-before-share can be switched off in Settings.
+- **Activity history** (Settings → *Wallet activity history*) lists, per day:
+  - wallet creation and security changes
+  - credentials added, rejected or failed, with the issuer
+  - every presentation: verifier, channel and the exact attributes shared
+  - declined requests and deletions
+
+  The history stays on the phone (`activity.json` in no-backup storage) and can be filtered or cleared.
 
 ## The PID mdoc
 
@@ -164,13 +233,14 @@ If the phone says **"App not installed"**:
 ## Presenting the PID
 
 - **Proximity verifiers** (ISO 18013-5), such as the EUDI reference verifier app or the multipaz verifier:
-  1. Tap **Show QR**, or tap the phone on an NFC-engagement reader.
+  1. Tap **Show QR** in the bottom bar (or on a credential), or tap the phone on an NFC-engagement reader.
   2. The verifier connects over BLE and requests elements.
   3. You approve on the consent screen.
 - **Web verifiers** (OpenID4VP), such as `verifier.eudiw.dev`:
   1. Choose the PID in *mso_mdoc* format.
-  2. Scan the verifier's QR with the phone camera, or open the same-device link. The app handles the `openid4vp://`, `eudi-openid4vp://`, `mdoc-openid4vp://` and `haip-vp://` schemes.
-  3. You approve on the consent screen.
+  2. Tap **Scan** in the wallet and point at the verifier's QR code, or open the same-device link. The app handles the `openid4vp://`, `eudi-openid4vp://`, `mdoc-openid4vp://` and `haip-vp://` schemes.
+  3. The consent screen shows the verifier, whether it is registered, and the attributes grouped by credential, marking any that will be stored.
+  4. Share, then confirm with your PIN or biometrics.
 - **Issuer trust**: signature, digest and device-auth checks will pass, but a verifier only reports the issuer as *trusted* if it trusts the dummy IACA. Import `GET /pki/iaca.pem` into the verifier's issuer trust store; most test verifiers and self-hosted EUDI verifier deployments let you add issuer certificates. The public EUDI test services only trust their own test issuers.
 - **Verifier trust in the wallet**: the wallet runs with `ReaderAuthPolicy.DoNotEnforce`. It shows whether a verifier's certificate chains to a trusted reader CA but leaves the decision to the user. Add reader and verifier CA certificates with `configureReaderTrustStore` in `WalletApp.kt` to mark them as trusted.
 
@@ -178,7 +248,7 @@ If the phone says **"App not installed"**:
 
 - Replace the dummy PKI with HSM-held IACA and DS keys, rotate DS certificates, and publish a real CRL or status list.
 - Import official CSCA master lists, set `PID_REQUIRE_CSCA_TRUST=true`, and check CSCA/DSC CRLs.
-- Add a proper document-authenticity provider, face matching and liveness (selfie vs. DG2 or the document portrait) to bind the person to the document.
-- Require wallet attestation (WIA/WUA) and key attestation for the device key, and move issuance to OpenID4VCI.
+- Add a proper document-authenticity provider, and replace the head-turn liveness with a certified PAD (ISO/IEC 30107-3) solution.
+- Replace the TEST Wallet Provider with a real one: verify Android Key Attestation against Google's roots, add app integrity (Play Integrity), issue a Wallet Instance Attestation, and use attestation-based client authentication. Offer DPoP and credential-response encryption on the issuer.
 - Enable `userAuthenticationRequired` for device keys (biometric unlock at presentation) in `WalletApp.kt`.
 - Replace the in-memory session store with a shared one (such as Redis) if you run several workers, and put the backend behind TLS.

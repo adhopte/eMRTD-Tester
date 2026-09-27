@@ -33,7 +33,7 @@ class BrandingScreenshotTest {
         compose.mainClock.autoAdvance = false
         compose.setContent { WalletTheme { Box(Modifier.fillMaxSize()) { TutorialScreen(onFinish = {}) } } }
         // Page-specific moments inside each looping animation
-        val moments = listOf(700L, 2300L, 2600L, 1500L, 2400L)
+        val moments = listOf(700L, 2300L, 2600L, 900L, 1500L, 2400L)
         moments.forEachIndexed { page, t ->
             compose.mainClock.advanceTimeBy(t)
             compose.onRoot().captureRoboImage("build/outputs/roborazzi/tutorial_${page + 1}.png")

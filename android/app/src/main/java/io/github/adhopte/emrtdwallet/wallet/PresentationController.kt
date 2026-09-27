@@ -7,6 +7,8 @@ import android.util.Log
 import eu.europa.ec.eudi.iso18013.transfer.TransferEvent
 import eu.europa.ec.eudi.iso18013.transfer.response.RequestProcessor
 import eu.europa.ec.eudi.wallet.EudiWallet
+import io.github.adhopte.emrtdwallet.data.ActivityLog
+import io.github.adhopte.emrtdwallet.data.ActivityType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,7 +21,13 @@ import org.multipaz.presentment.CredentialPresentmentSelection
 import org.multipaz.request.MdocRequestedClaim
 
 /** A claim the verifier asked for, ready for the consent screen. */
-data class RequestedItem(val namespace: String, val element: String, val displayName: String, val intentToRetain: Boolean)
+data class RequestedItem(
+    val namespace: String,
+    val element: String,
+    val displayName: String,
+    val intentToRetain: Boolean,
+    val document: String = "",
+)
 
 data class ConsentRequest(
     val verifier: String,
@@ -35,7 +43,7 @@ sealed interface PresentationState {
     data object Connected : PresentationState
     data class AwaitingConsent(val request: ConsentRequest) : PresentationState
     data object Sending : PresentationState
-    data class Done(val redirectUri: String?) : PresentationState
+    data class Done(val redirectUri: String?, val verifier: String? = null, val shared: List<String> = emptyList()) : PresentationState
     data class Failed(val message: String) : PresentationState
 }
 
@@ -43,7 +51,11 @@ sealed interface PresentationState {
  * Bridges wallet-core transfer events (ISO 18013-5 proximity over BLE/NFC and OpenID4VP
  * remote presentation) to UI state, and turns the user's consent into a response.
  */
-class PresentationController(context: Context, private val wallet: EudiWallet) : TransferEvent.Listener {
+class PresentationController(
+    context: Context,
+    private val wallet: EudiWallet,
+    private val activity: ActivityLog,
+) : TransferEvent.Listener {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val _state = MutableStateFlow<PresentationState>(PresentationState.Idle)
@@ -51,19 +63,24 @@ class PresentationController(context: Context, private val wallet: EudiWallet) :
 
     private var pending: RequestProcessor.ProcessedRequest.Success? = null
     private var transport = "proximity"
+    private var verifierName: String? = null
+    private var sharedItems: List<String> = emptyList()
+    private var sent = false
 
     init {
         wallet.addTransferEventListener(this)
     }
 
     fun startProximity() {
-        transport = "ISO/IEC 18013-5 (BLE)"
+        clearSession()
+        transport = "In person (ISO/IEC 18013-5)"
         _state.value = PresentationState.Connecting
         wallet.startProximityPresentation()
     }
 
     fun startRemote(uri: Uri) {
-        transport = "OpenID4VP"
+        clearSession()
+        transport = REMOTE
         _state.value = PresentationState.Connecting
         wallet.startRemotePresentation(uri)
     }
@@ -75,15 +92,27 @@ class PresentationController(context: Context, private val wallet: EudiWallet) :
             is TransferEvent.Connecting -> _state.value = PresentationState.Connecting
             is TransferEvent.Connected -> _state.value = PresentationState.Connected
             is TransferEvent.RequestReceived -> onRequest(event)
-            is TransferEvent.ResponseSent -> _state.value = PresentationState.Done(null)
-            is TransferEvent.Redirect -> _state.value = PresentationState.Done(event.redirectUri.toString())
+            is TransferEvent.ResponseSent -> {
+                logShared()
+                _state.value = PresentationState.Done(null, verifierName, sharedItems)
+            }
+            is TransferEvent.Redirect -> {
+                logShared()
+                _state.value = PresentationState.Done(event.redirectUri.toString(), verifierName, sharedItems)
+            }
             is TransferEvent.Disconnected -> {
-                if (_state.value !is PresentationState.Done) _state.value = PresentationState.Done(null)
+                val s = _state.value
+                if (s !is PresentationState.Done && s !is PresentationState.Failed && s !is PresentationState.Idle) {
+                    _state.value = if (sent) PresentationState.Done(null, verifierName, sharedItems)
+                    else PresentationState.Failed("The verifier disconnected before a request was completed")
+                }
                 stopTransports()
             }
             is TransferEvent.Error -> {
                 Log.w(TAG, "transfer error", event.error)
-                _state.value = PresentationState.Failed(event.error.message ?: event.error.toString())
+                val msg = event.error.message ?: event.error.toString()
+                activity.add(ActivityType.PRESENTATION_FAILED, "Sharing failed", msg, verifierName)
+                _state.value = PresentationState.Failed(msg)
                 stopTransports()
             }
             else -> Log.d(TAG, "unhandled transfer event $event")
@@ -109,6 +138,7 @@ class PresentationController(context: Context, private val wallet: EudiWallet) :
             ?: requester.appId
             ?: requester.certChain?.certificates?.firstOrNull()?.subject?.name
             ?: "Unknown verifier"
+        verifierName = verifier
         _state.value = PresentationState.AwaitingConsent(
             ConsentRequest(
                 verifier = verifier,
@@ -121,6 +151,7 @@ class PresentationController(context: Context, private val wallet: EudiWallet) :
 
     private fun describe(selection: CredentialPresentmentSelection): List<RequestedItem> =
         selection.matches.flatMap { match ->
+            val docName = runCatching { match.credential.document.displayName }.getOrNull().orEmpty()
             match.claims.map { (requested, claim) ->
                 val mdoc = requested as? MdocRequestedClaim
                 RequestedItem(
@@ -128,6 +159,7 @@ class PresentationController(context: Context, private val wallet: EudiWallet) :
                     element = mdoc?.dataElementName ?: claim.displayName,
                     displayName = claim.displayName,
                     intentToRetain = mdoc?.intentToRetain ?: false,
+                    document = docName,
                 )
             }
         }
@@ -138,11 +170,15 @@ class PresentationController(context: Context, private val wallet: EudiWallet) :
         scope.launch {
             try {
                 val selection = request.presentmentSelections[optionIndex]
+                sharedItems = describe(selection).map { it.displayName }
                 // Device keys are created without user-auth requirements, so no unlock data is needed.
                 val response = request.generateResponse(selection, emptyMap()).getOrThrow()
                 wallet.sendResponse(response)
+                sent = true
+                // proximity transports stay connected; the event log gets the entry on ResponseSent
             } catch (e: Throwable) {
                 Log.w(TAG, "response generation failed", e)
+                activity.add(ActivityType.PRESENTATION_FAILED, "Sharing failed", e.message ?: e.toString(), verifierName)
                 _state.value = PresentationState.Failed(e.message ?: e.toString())
                 stopTransports()
             } finally {
@@ -152,9 +188,28 @@ class PresentationController(context: Context, private val wallet: EudiWallet) :
     }
 
     fun reject() {
+        val request = (_state.value as? PresentationState.AwaitingConsent)?.request
         pending = null
-        if (transport == "OpenID4VP") wallet.rejectRemotePresentation() else stopTransports()
+        activity.add(ActivityType.PRESENTATION_DECLINED, "Declined a request", transport, verifierName,
+            request?.options?.firstOrNull()?.map { it.displayName }.orEmpty())
+        if (transport == REMOTE) runCatching { wallet.rejectRemotePresentation() } else stopTransports()
         _state.value = PresentationState.Idle
+    }
+
+    private var logged = false
+
+    private fun logShared() {
+        if (logged) return
+        logged = true
+        activity.add(ActivityType.PRESENTED, "Shared ${sharedItems.size} attribute(s)", transport, verifierName, sharedItems)
+    }
+
+    private fun clearSession() {
+        verifierName = null
+        sharedItems = emptyList()
+        sent = false
+        logged = false
+        pending = null
     }
 
     fun reset() {
@@ -170,5 +225,6 @@ class PresentationController(context: Context, private val wallet: EudiWallet) :
 
     private companion object {
         const val TAG = "Presentation"
+        const val REMOTE = "Online (OpenID4VP)"
     }
 }

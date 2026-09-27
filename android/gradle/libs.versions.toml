@@ -8,6 +8,8 @@ navigation = "2.9.3"
 coreKtx = "1.16.0"
 camerax = "1.4.2"
 mlkitText = "16.0.1"
+mlkitBarcode = "17.3.0"
+mlkitFace = "16.1.7"
 jmrtd = "0.8.8"
 scubaAndroid = "0.0.27"
 eudiWalletCore = "0.30.2"
@@ -36,6 +38,8 @@ camerax-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "ca
 camerax-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
 camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
 mlkit-text = { module = "com.google.mlkit:text-recognition", version.ref = "mlkitText" }
+mlkit-barcode = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkitBarcode" }
+mlkit-face = { module = "com.google.mlkit:face-detection", version.ref = "mlkitFace" }
 jmrtd = { module = "org.jmrtd:jmrtd", version.ref = "jmrtd" }
 scuba-android = { module = "net.sf.scuba:scuba-sc-android", version.ref = "scubaAndroid" }
 eudi-wallet-core = { module = "eu.europa.ec.eudi:eudi-lib-android-wallet-core", version.ref = "eudiWalletCore" }

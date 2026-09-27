@@ -7,18 +7,36 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.GppMaybe
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Nfc
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -31,9 +49,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.adhopte.emrtdwallet.wallet.ConsentRequest
 import io.github.adhopte.emrtdwallet.wallet.PresentationState
@@ -65,52 +85,60 @@ fun PresentScreen(vm: MainViewModel, onClose: () -> Unit) {
     val presentation = vm.repository.presentation
     val state by presentation.state.collectAsState()
     val context = LocalContext.current
-    Scaffold(topBar = { SimpleTopBar("Share PID", onClose) }) { padding ->
+    val auth = rememberAuthenticator(vm.lock)
+    val title = when (state) {
+        is PresentationState.QrReady -> "Share in person"
+        is PresentationState.AwaitingConsent -> "Review request"
+        else -> "Share"
+    }
+    Scaffold(topBar = { SimpleTopBar(title, onClose) }) { padding ->
         Column(
-            Modifier.padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
+            Modifier.padding(padding).padding(20.dp).verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             when (val s = state) {
-                PresentationState.Idle, PresentationState.Connecting -> {
-                    CircularProgressIndicator()
-                    Text("Waiting for the verifier…")
-                }
+                PresentationState.Idle, PresentationState.Connecting -> Waiting("Connecting to the verifier…")
                 is PresentationState.QrReady -> {
-                    Text("Let the verifier scan this code", style = MaterialTheme.typography.titleMedium)
-                    Image(s.qr.asImageBitmap(), "Device engagement QR code", Modifier.size(300.dp))
-                    val tapHint = if (rememberNfcStatus() == NfcStatus.ENABLED) {
-                        " NFC readers can also engage by tapping the phone."
-                    } else ""
-                    Text("ISO/IEC 18013-5 device engagement over BLE. Keep Bluetooth on.$tapHint",
-                        style = MaterialTheme.typography.bodySmall)
+                    Text("Let the verifier scan this code", style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+                    Card(shape = RoundedCornerShape(24.dp), elevation = CardDefaults.cardElevation(6.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                        Image(s.qr.asImageBitmap(), "Device engagement QR code", Modifier.padding(16.dp).size(280.dp))
+                    }
+                    Text("Nothing is shared yet: you will see who is asking and what, and decide.",
+                        textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Hint(Icons.Filled.Bluetooth, "Keep Bluetooth on")
+                        if (rememberNfcStatus() == NfcStatus.ENABLED) Hint(Icons.Filled.Nfc, "Or tap an NFC reader")
+                    }
                 }
-                PresentationState.Connected -> {
-                    CircularProgressIndicator()
-                    Text("Connected — waiting for the request…")
-                }
+                PresentationState.Connected -> Waiting("Connected — waiting for the verifier's request…")
                 is PresentationState.AwaitingConsent -> Consent(
                     s.request,
-                    onAccept = { presentation.accept(it) },
+                    onAccept = { option -> auth.request("Share your data") { presentation.accept(option) } },
                     onReject = { presentation.reject(); onClose() },
                 )
-                PresentationState.Sending -> {
-                    CircularProgressIndicator()
-                    Text("Sending response…")
-                }
+                PresentationState.Sending -> Waiting("Sending your data securely…")
                 is PresentationState.Done -> {
-                    Text("Shared successfully", style = MaterialTheme.typography.titleLarge)
+                    Spacer(Modifier.height(24.dp))
+                    Icon(Icons.Filled.CheckCircle, null, Modifier.size(88.dp), tint = Color(0xFF2E7D32))
+                    Text("Shared successfully", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    s.verifier?.let { Text("with $it", style = MaterialTheme.typography.titleMedium) }
+                    if (s.shared.isNotEmpty()) Text("${s.shared.size} attribute(s): ${s.shared.joinToString()}",
+                        textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall)
                     s.redirectUri?.let { uri ->
-                        Button(onClick = {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri)))
-                        }) { Text("Return to the verifier") }
+                        Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri))) },
+                            modifier = Modifier.fillMaxWidth()) { Text("Continue on the website") }
                     }
-                    OutlinedButton(onClick = onClose) { Text("Close") }
+                    OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Done") }
                 }
                 is PresentationState.Failed -> {
-                    Text("Presentation failed", style = MaterialTheme.typography.titleLarge)
-                    Text(s.message, color = MaterialTheme.colorScheme.error)
-                    OutlinedButton(onClick = onClose) { Text("Close") }
+                    Spacer(Modifier.height(24.dp))
+                    Icon(Icons.Filled.Error, null, Modifier.size(80.dp), tint = MaterialTheme.colorScheme.error)
+                    Text("Sharing failed", style = MaterialTheme.typography.headlineSmall)
+                    Text(s.message, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+                    OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Close") }
                 }
             }
         }
@@ -118,16 +146,45 @@ fun PresentScreen(vm: MainViewModel, onClose: () -> Unit) {
 }
 
 @Composable
+private fun Waiting(text: String) {
+    Spacer(Modifier.height(48.dp))
+    CircularProgressIndicator()
+    Text(text, textAlign = TextAlign.Center)
+}
+
+@Composable
+private fun Hint(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+        Text(" $text", style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
 private fun Consent(request: ConsentRequest, onAccept: (Int) -> Unit, onReject: () -> Unit) {
     var option by remember { mutableIntStateOf(0) }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(request.verifier, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        Text(
-            (if (request.verifierTrusted) "Verified relying party" else "Verifier identity not verified by a trusted list") +
-                " · ${request.transport}",
-            style = MaterialTheme.typography.bodySmall,
-            color = if (request.verifierTrusted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(52.dp).background(
+                    if (request.verifierTrusted) Color(0xFF2E7D32).copy(alpha = 0.15f) else Color(0xFFF9A825).copy(alpha = 0.18f),
+                    CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(if (request.verifierTrusted) Icons.Filled.VerifiedUser else Icons.Filled.GppMaybe, null,
+                        tint = if (request.verifierTrusted) Color(0xFF2E7D32) else Color(0xFFB77900))
+                }
+                Column(Modifier.padding(start = 14.dp)) {
+                    Text(request.verifier, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(if (request.verifierTrusted) "Registered relying party" else "Identity not confirmed by a trusted list",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (request.verifierTrusted) Color(0xFF2E7D32) else Color(0xFFB77900))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
+                        Icon(Icons.Filled.Language, null, Modifier.size(14.dp))
+                        Text(" ${request.transport}", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+        Text("wants to see", style = MaterialTheme.typography.titleSmall)
         if (request.options.size > 1) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 request.options.indices.forEach { i ->
@@ -135,21 +192,31 @@ private fun Consent(request: ConsentRequest, onAccept: (Int) -> Unit, onReject: 
                 }
             }
         }
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(12.dp)) {
-                Text("Requested from your PID", style = MaterialTheme.typography.labelLarge)
-                request.options[option].forEach { item ->
-                    Row(Modifier.padding(top = 6.dp)) {
-                        Text(item.displayName, Modifier.weight(1f))
-                        if (item.intentToRetain) Text("will be stored", style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error)
+        request.options[option].groupBy { it.document.ifBlank { "Your credential" } }.forEach { (doc, items) ->
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(doc, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    items.forEachIndexed { i, item ->
+                        if (i > 0) HorizontalDivider(Modifier.padding(vertical = 6.dp), color = MaterialTheme.colorScheme.surfaceVariant)
+                        else Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.CheckCircle, null, Modifier.size(18.dp), tint = InGroupe.SkyBlue)
+                            Text(claimLabel(item.element).takeIf { it != item.element } ?: item.displayName,
+                                Modifier.padding(start = 10.dp).weight(1f))
+                            if (item.intentToRetain) Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Filled.Storage, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
+                                Text(" stored", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                            }
+                        }
                     }
                 }
             }
         }
+        Text("Only the attributes above are shared, signed by your wallet. Check the verifier before you share.",
+            style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onReject) { Text("Decline") }
-            Button(onClick = { onAccept(option) }) { Text("Share") }
+            OutlinedButton(onClick = onReject, modifier = Modifier.weight(1f)) { Text("Decline") }
+            Button(onClick = { onAccept(option) }, modifier = Modifier.weight(1f)) { Text("Share") }
         }
     }
 }

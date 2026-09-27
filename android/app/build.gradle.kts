@@ -14,8 +14,8 @@ android {
         applicationId = "io.github.adhopte.emrtdwallet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "1.2.2"
+        versionCode = 8
+        versionName = "2.0.0"
         // Default issuer backend; can be changed at runtime in Settings.
         // Override at build time: ./gradlew assembleDebug -PissuerUrl=https://my-issuer.onrender.com
         // (http://10.0.2.2:8000 is the host machine when running in the Android emulator.)
@@ -58,6 +58,10 @@ android {
     testOptions {
         // Robolectric screenshot tests (Roborazzi) render Compose screens on the JVM
         unitTests.isIncludeAndroidResources = true
+        // Opt-in end-to-end OpenID4VCI test against a live backend: -Pe2eIssuer=https://…
+        unitTests.all { test ->
+            (project.findProperty("e2eIssuer") as String?)?.let { test.systemProperty("e2eIssuer", it) }
+        }
     }
     buildFeatures {
         compose = true
@@ -106,6 +110,8 @@ dependencies {
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.view)
     implementation(libs.mlkit.text)
+    implementation(libs.mlkit.barcode)
+    implementation(libs.mlkit.face)
     implementation(libs.androidx.exifinterface)
     implementation(libs.kotlinx.coroutines.play.services)
 

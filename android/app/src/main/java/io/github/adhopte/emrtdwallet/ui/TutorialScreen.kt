@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -87,14 +88,20 @@ private val pages = listOf(
             "checked by IN Groupe — Passive, Active and Chip Authentication.",
     ) { NfcIllustration() },
     TutorialPage(
+        "3 · Take a live selfie",
+        "Blink and turn your head when asked, then look at the camera. IN Groupe compares your face with the " +
+            "photo from the chip or the document before issuing your PID.",
+    ) { SelfieIllustration() },
+    TutorialPage(
         "No chip or no NFC? Auto scan",
         "Choose \"Scan document\". Hold the ID card front, then the back, inside the frame — each side is " +
             "captured automatically when it is sharp and steady. You can also upload a photo or PDF.",
     ) { CardAutoScanIllustration() },
     TutorialPage(
-        "Share only what is needed",
-        "Show a QR code to an in-person verifier, or open a web verifier's link. You always see who is " +
-            "asking and approve exactly which details are shared.",
+        "Scan · Share · Add",
+        "Tap Scan to read a website's QR code and share your data, or an issuer's QR code to add a credential " +
+            "such as a photo ID or proof of age. Show QR shares in person. You see who is asking and confirm " +
+            "with your PIN or fingerprint.",
     ) { ShareIllustration() },
 )
 
@@ -401,6 +408,39 @@ private fun ShareIllustration() {
                     Text("Waiting…", color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SelfieIllustration() {
+    val p = loop(4000)
+    // head turns left, back, right, back; the oval turns green once all poses were seen
+    val turn = when {
+        p < 0.25f -> ease(phase(p, 0f, 0.25f))
+        p < 0.5f -> 1f - ease(phase(p, 0.25f, 0.5f))
+        p < 0.75f -> -ease(phase(p, 0.5f, 0.75f))
+        else -> -1f + ease(phase(p, 0.75f, 1f))
+    }
+    val ok = p > 0.9f
+    PhoneFrame(width = 130.dp) {
+        Box(Modifier.fillMaxSize().background(Color(0xFF1B2650)), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.size(90.dp, 118.dp)) {
+                drawOval(if (ok) Color(0xFF4CAF50) else Color.White, style = Stroke(width = 3.dp.toPx()))
+            }
+            Icon(
+                Icons.Filled.Face, null, tint = InGroupe.SkyBlue,
+                modifier = Modifier.size(72.dp).offset(x = (turn * 10).dp).graphicsLayer { rotationY = turn * 35f },
+            )
+            Text(
+                when {
+                    ok -> "✓"
+                    p < 0.5f -> "Turn left"
+                    else -> "Turn right"
+                },
+                color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
+            )
         }
     }
 }

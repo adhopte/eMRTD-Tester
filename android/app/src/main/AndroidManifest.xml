@@ -46,6 +46,21 @@
                 <data android:scheme="mdoc-openid4vp" />
                 <data android:scheme="haip-vp" />
             </intent-filter>
+            <!-- OpenID4VCI credential offers (issuer QR codes / links) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="openid-credential-offer" />
+                <data android:scheme="haip-vci" />
+            </intent-filter>
+            <!-- OpenID4VCI authorization code flow redirect -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="eudi-openid4ci" android:host="authorize" />
+            </intent-filter>
             <!-- ISO 18013-7 reverse engagement -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

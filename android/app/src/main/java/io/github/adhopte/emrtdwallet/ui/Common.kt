@@ -126,11 +126,12 @@ fun CameraPreview(
     modifier: Modifier = Modifier,
     analyzer: ImageAnalysis.Analyzer? = null,
     imageCapture: ImageCapture? = null,
+    front: Boolean = false,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val previewView = remember { PreviewView(context) }
-    DisposableEffect(analyzer, imageCapture) {
+    DisposableEffect(analyzer, imageCapture, front) {
         val providerFuture = ProcessCameraProvider.getInstance(context)
         val executor = ContextCompat.getMainExecutor(context)
         providerFuture.addListener({
@@ -146,7 +147,8 @@ fun CameraPreview(
                 imageCapture?.let { add(it) }
             }
             provider.unbindAll()
-            provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, *useCases.toTypedArray())
+            val selector = if (front) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
+            runCatching { provider.bindToLifecycle(lifecycleOwner, selector, *useCases.toTypedArray()) }
         }, executor)
         onDispose { runCatching { providerFuture.get().unbindAll() } }
     }
@@ -172,6 +174,7 @@ private val SECTION_TITLES = mapOf(
     "image_quality" to "Image quality",
     "document_authenticity_heuristics" to "Authenticity checks",
     "document_content" to "MRZ / VIZ content",
+    "biometrics" to "Selfie: face match & liveness",
 )
 
 @Composable

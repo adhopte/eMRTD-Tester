@@ -1,0 +1,194 @@
+package io.github.adhopte.emrtdwallet.wallet
+
+import android.net.Uri
+import android.util.Log
+import com.nimbusds.jose.jwk.Curve
+import eu.europa.ec.eudi.openid4vci.CredentialResponseEncryptionPolicy
+import eu.europa.ec.eudi.openid4vci.CredentialReusePolicies
+import eu.europa.ec.eudi.openid4vci.EncryptionSupportConfig
+import eu.europa.ec.eudi.openid4vci.EudiReusePolicyType
+import eu.europa.ec.eudi.openid4vci.TxCodeInputMode
+import eu.europa.ec.eudi.wallet.EudiWallet
+import eu.europa.ec.eudi.wallet.document.CreateDocumentSettings
+import eu.europa.ec.eudi.wallet.document.DocumentExtensions.getDefaultCreateDocumentSettings
+import eu.europa.ec.eudi.wallet.document.DocumentExtensions.getDefaultCreateKeySettings
+import eu.europa.ec.eudi.wallet.document.format.MsoMdocFormat
+import eu.europa.ec.eudi.wallet.document.format.SdJwtVcFormat
+import eu.europa.ec.eudi.wallet.issue.openid4vci.IssueEvent
+import eu.europa.ec.eudi.wallet.issue.openid4vci.Offer
+import eu.europa.ec.eudi.wallet.issue.openid4vci.OfferResult
+import eu.europa.ec.eudi.wallet.issue.openid4vci.OpenId4VciManager
+import io.github.adhopte.emrtdwallet.data.ActivityLog
+import io.github.adhopte.emrtdwallet.data.ActivityType
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+data class OfferedItem(val name: String, val docType: String)
+
+data class TxCodeSpec(val numeric: Boolean, val length: Int?, val description: String?)
+
+sealed interface OfferState {
+    data object Idle : OfferState
+    data object Resolving : OfferState
+    data class Ready(val issuer: String, val items: List<OfferedItem>, val txCode: TxCodeSpec?) : OfferState
+    data class Issuing(val message: String) : OfferState
+    data class Done(val issuer: String, val issued: List<String>, val failed: List<String>, val deferred: List<String>) : OfferState
+    data class Failed(val message: String) : OfferState
+}
+
+/**
+ * OpenID4VCI credential offers (``openid-credential-offer://`` QR codes and links): resolve the
+ * offer, show it for consent, then run the pre-authorized code flow (with transaction code) or
+ * the authorization code flow and store the issued credentials.
+ */
+class OfferController(
+    private val wallet: EudiWallet,
+    private val activity: ActivityLog,
+    private val onIssued: () -> Unit,
+) {
+    private val _state = MutableStateFlow<OfferState>(OfferState.Idle)
+    val state: StateFlow<OfferState> = _state.asStateFlow()
+
+    private var offer: Offer? = null
+    private var issuerName = ""
+
+    private val manager: OpenId4VciManager by lazy { wallet.createOpenId4VciManager(managerConfig()) }
+
+    fun resolve(uri: String) {
+        offer = null
+        _state.value = OfferState.Resolving
+        manager.resolveDocumentOffer(uri) { result ->
+            when (result) {
+                is OfferResult.Success -> {
+                    val o = result.offer
+                    offer = o
+                    issuerName = o.issuerMetadata.display.firstOrNull()?.name
+                        ?: runCatching { Uri.parse(o.issuerMetadata.credentialIssuerIdentifier.toString()).host }.getOrNull()
+                        ?: "Issuer"
+                    val items = o.offeredDocuments.map { d ->
+                        val docType = when (val f = d.documentFormat) {
+                            is MsoMdocFormat -> f.docType
+                            is SdJwtVcFormat -> f.vct
+                            else -> ""
+                        }
+                        OfferedItem(d.configuration.credentialMetadata?.display?.firstOrNull()?.name ?: docTypeName(docType), docType)
+                    }
+                    val tx = o.txCodeSpec?.let { TxCodeSpec(it.inputMode == TxCodeInputMode.NUMERIC, it.length, it.description) }
+                    _state.value = OfferState.Ready(issuerName, items, tx)
+                }
+                is OfferResult.Failure -> {
+                    Log.w(TAG, "offer resolution failed", result.cause)
+                    _state.value = OfferState.Failed("Could not read the credential offer: ${result.cause.message ?: result.cause}")
+                }
+            }
+        }
+    }
+
+    fun accept(txCode: String?) {
+        val o = offer ?: return
+        val issued = mutableListOf<String>()
+        val failed = mutableListOf<String>()
+        val deferred = mutableListOf<String>()
+        _state.value = OfferState.Issuing("Connecting to $issuerName…")
+        manager.issueDocumentByOffer(o, txCode?.takeIf { it.isNotBlank() }) { event ->
+            when (event) {
+                is IssueEvent.Started -> _state.value = OfferState.Issuing("Requesting ${event.total} credential(s)…")
+                is IssueEvent.DocumentRequiresCreateSettings.OptionalReusePolicy -> {
+                    // One credential, reused for every presentation
+                    event.resume(
+                        wallet.getDefaultCreateDocumentSettings(
+                            offeredDocument = event.offeredDocument,
+                            credentialPolicy = CreateDocumentSettings.CredentialPolicy.RotatingBatch(numberOfCredentials = 1),
+                        )
+                    )
+                }
+                is IssueEvent.DocumentRequiresCreateSettings.MandatoryReusePolicy -> {
+                    val (secureArea, keySettings) = wallet.getDefaultCreateKeySettings()
+                    event.resume(secureArea, keySettings)
+                }
+                is IssueEvent.DocumentRequiresUserAuth -> event.cancel("device keys do not require user authentication")
+                is IssueEvent.DocumentIssued -> {
+                    issued += event.name
+                    _state.value = OfferState.Issuing("Stored ${event.name}")
+                }
+                is IssueEvent.DocumentFailed -> {
+                    Log.w(TAG, "document failed", event.cause)
+                    failed += "${event.name}: ${event.cause.message ?: event.cause}"
+                }
+                is IssueEvent.DocumentDeferred -> deferred += event.name
+                is IssueEvent.Finished -> finish(issued, failed, deferred)
+                is IssueEvent.Failure -> {
+                    Log.w(TAG, "issuance failed", event.cause)
+                    val msg = event.cause.message ?: event.cause.toString()
+                    activity.add(ActivityType.ISSUANCE_FAILED, "Issuance failed", msg, issuerName)
+                    _state.value = OfferState.Failed(friendly(msg))
+                }
+                else -> Log.d(TAG, "issue event $event")
+            }
+        }
+    }
+
+    private fun finish(issued: List<String>, failed: List<String>, deferred: List<String>) {
+        onIssued()
+        if (issued.isNotEmpty()) activity.add(ActivityType.ISSUED, "Added ${issued.joinToString()}", "OpenID4VCI", issuerName, issued)
+        if (failed.isNotEmpty()) activity.add(ActivityType.ISSUANCE_FAILED, "Issuance failed", failed.joinToString("\n"), issuerName)
+        _state.value = OfferState.Done(issuerName, issued, failed, deferred)
+    }
+
+    fun decline() {
+        if (_state.value is OfferState.Ready) activity.add(ActivityType.ISSUANCE_REJECTED, "Declined credential offer", "", issuerName)
+        reset()
+    }
+
+    fun reset() {
+        offer = null
+        _state.value = OfferState.Idle
+    }
+
+    /** Authorization code flow: the browser redirected back to the wallet. */
+    fun resumeAuthorization(uri: Uri) = runCatching { manager.resumeWithAuthorization(uri) }
+
+    private fun friendly(msg: String): String = when {
+        "invalid_grant" in msg || "transaction code" in msg.lowercase() ->
+            "The issuer did not accept the code (wrong transaction code, or the offer was already used / expired)."
+        else -> msg
+    }
+
+    companion object {
+        private const val TAG = "OfferController"
+
+        fun managerConfig(): OpenId4VciManager.Config = OpenId4VciManager.Config.Builder()
+            .withClientAuthenticationType(OpenId4VciManager.ClientAuthenticationType.None(CLIENT_ID))
+            .withAuthFlowRedirectionURI(AUTH_REDIRECT)
+            .withParUsage(OpenId4VciManager.Config.ParUsage.IF_SUPPORTED)
+            // Encrypt credential responses whenever the issuer supports it, but do not
+            // refuse issuers (like this project's backend) that do not
+            .withResponseEncryptionConfig(
+                EncryptionSupportConfig(Curve.P_256, 2048, CredentialResponseEncryptionPolicy.SUPPORTED)
+            )
+            .withSupportedCredentialReusePolicies(
+                CredentialReusePolicies.Supported(
+                    setOf(EudiReusePolicyType.OnceOnly, EudiReusePolicyType.LimitedTime, EudiReusePolicyType.RotatingBatch)
+                )
+            )
+            .build()
+        const val CLIENT_ID = "getyourid-wallet"
+        const val AUTH_REDIRECT = "eudi-openid4ci://authorize"
+
+        fun isCredentialOffer(text: String): Boolean {
+            val t = text.trim()
+            return t.startsWith("openid-credential-offer://") || t.startsWith("haip-vci://") ||
+                t.startsWith("eudi-openid4ci://credential") ||
+                (t.startsWith("https://") && ("credential_offer=" in t || "credential_offer_uri=" in t))
+        }
+    }
+}
+
+fun docTypeName(docType: String): String = when (docType) {
+    PID_DOCTYPE -> "Person Identification Data"
+    "org.iso.23220.photoID.1" -> "Photo ID"
+    "eu.europa.ec.av.1" -> "Age verification"
+    "org.iso.18013.5.1.mDL" -> "Mobile driving licence"
+    else -> docType.substringAfterLast('.').ifBlank { docType }
+}

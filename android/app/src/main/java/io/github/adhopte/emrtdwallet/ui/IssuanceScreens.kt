@@ -30,6 +30,11 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.compose.foundation.Image
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Card
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -167,7 +172,7 @@ fun NfcReadScreen(vm: MainViewModel, onDone: () -> Unit, onUseImageScan: () -> U
         }
         onDispose { if (activity != null) adapter?.disableReaderMode(activity) }
     }
-    LaunchedEffect(state) { if (state is IssuanceState.Finished) onDone() }
+    LaunchedEffect(state) { if (state is IssuanceState.NeedSelfie) onDone() }
 
     Scaffold(topBar = { SimpleTopBar("Read the chip", onBack) }) { padding ->
         Column(
@@ -285,7 +290,7 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
         }
     }
 
-    LaunchedEffect(state) { if (state is IssuanceState.Finished) onDone() }
+    LaunchedEffect(state) { if (state is IssuanceState.NeedSelfie) onDone() }
 
     val haptics = LocalHapticFeedback.current
     var autoCapture by remember { mutableStateOf(true) }
@@ -416,7 +421,7 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
             if (front != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { front = null; back = null; uploaded = false; combinedSides = false; error = null; vm.resetIssuance() }) { Text("Start over") }
-                    Button(onClick = { vm.submitImages(front!!, back, kind, uploaded) }, enabled = ready) { Text("Verify & issue PID") }
+                    Button(onClick = { vm.prepareImages(front!!, back, kind, uploaded) }, enabled = ready) { Text("Continue") }
                 }
             }
         }
@@ -470,33 +475,64 @@ private fun Thumb(jpeg: ByteArray, label: String) {
 // ---------------------------------------------------------------------------
 
 @Composable
-fun ResultScreen(vm: MainViewModel, onFinish: () -> Unit) {
+fun ResultScreen(vm: MainViewModel, onFinish: () -> Unit, onOffer: (String) -> Unit, onRetry: () -> Unit) {
     val state by vm.issuance.collectAsState()
-    Scaffold(topBar = { SimpleTopBar("Verification result") }) { padding ->
+    Scaffold(topBar = { SimpleTopBar("Your PID") }) { padding ->
         Column(Modifier.padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            val s = state
-            if (s !is IssuanceState.Finished) {
-                Text("No result")
-                Button(onClick = onFinish) { Text("Back to wallet") }
-                return@Column
-            }
-            val resp = s.outcome.response
-            val accepted = s.outcome.document != null
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    if (accepted) Icons.Filled.CheckCircle else Icons.Filled.Error, null, Modifier.size(40.dp),
-                    tint = if (accepted) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error,
-                )
-                Column(Modifier.padding(start = 12.dp)) {
-                    Text(if (accepted) "PID issued and stored" else "PID not issued", style = MaterialTheme.typography.titleLarge)
-                    resp.score?.let { Text("Document score ${"%.2f".format(it)}", style = MaterialTheme.typography.bodySmall) }
+            verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            when (val s = state) {
+                is IssuanceState.Working -> {
+                    Spacer(Modifier.height(64.dp))
+                    CircularProgressIndicator(Modifier.size(56.dp))
+                    Text(s.message, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+                    Text("This can take up to a minute when the issuer has been idle.", style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center)
+                }
+                is IssuanceState.Failed -> {
+                    Spacer(Modifier.height(48.dp))
+                    Icon(Icons.Filled.Error, null, Modifier.size(64.dp), tint = MaterialTheme.colorScheme.error)
+                    Text("Something went wrong", style = MaterialTheme.typography.titleLarge)
+                    Text(s.message, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+                    Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("Try again") }
+                    OutlinedButton(onClick = onFinish, modifier = Modifier.fillMaxWidth()) { Text("Back to wallet") }
+                }
+                is IssuanceState.Finished -> FinishedResult(s, onFinish, onOffer)
+                else -> {
+                    Text("No result")
+                    Button(onClick = onFinish) { Text("Back to wallet") }
                 }
             }
-            resp.reasons.forEach { Text("• $it", color = MaterialTheme.colorScheme.error) }
-            s.notes.forEach { Text("ℹ $it", style = MaterialTheme.typography.bodySmall) }
-            ReportView(resp.report)
-            Button(onClick = onFinish, modifier = Modifier.fillMaxWidth()) { Text("Back to wallet") }
         }
     }
+}
+
+@Composable
+private fun FinishedResult(s: IssuanceState.Finished, onFinish: () -> Unit, onOffer: (String) -> Unit) {
+    val resp = s.outcome.response
+    val doc = s.outcome.document
+    if (doc != null) {
+        Icon(Icons.Filled.CheckCircle, null, Modifier.size(56.dp), tint = Color(0xFF2E7D32))
+        Text("Your PID is in your wallet", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center)
+        DocumentCard(doc) {}
+        resp.attestation_offer?.takeIf { it.credentials.isNotEmpty() }?.let { offer ->
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Also available from the same check", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    offer.credentials.forEach { Text("• ${it.name}") }
+                    Button(onClick = { onOffer(offer.uri) }, modifier = Modifier.fillMaxWidth()) { Text("Add attestations") }
+                }
+            }
+        }
+    } else {
+        Icon(Icons.Filled.Error, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.error)
+        Text("PID not issued", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        resp.reasons.forEach { Text("• $it", color = MaterialTheme.colorScheme.error) }
+    }
+    resp.score?.let { Text("Document score ${"%.2f".format(it)}", style = MaterialTheme.typography.bodySmall) }
+    s.notes.forEach { Text("ℹ $it", style = MaterialTheme.typography.bodySmall) }
+    Text("Verification report", style = MaterialTheme.typography.titleSmall, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+    ReportView(resp.report)
+    Button(onClick = onFinish, modifier = Modifier.fillMaxWidth()) { Text("Back to wallet") }
 }

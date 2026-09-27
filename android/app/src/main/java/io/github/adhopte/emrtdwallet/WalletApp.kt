@@ -7,9 +7,12 @@ import eu.europa.ec.eudi.wallet.EudiWalletConfig
 import eu.europa.ec.eudi.wallet.logging.Logger
 import eu.europa.ec.eudi.wallet.transfer.openId4vp.ClientIdScheme
 import eu.europa.ec.eudi.wallet.transfer.openId4vp.Format
+import io.github.adhopte.emrtdwallet.data.ActivityLog
 import io.github.adhopte.emrtdwallet.data.AppSettings
 import io.github.adhopte.emrtdwallet.data.IssuerApi
+import io.github.adhopte.emrtdwallet.security.WalletLock
 import io.github.adhopte.emrtdwallet.wallet.PidNfcEngagementService
+import io.github.adhopte.emrtdwallet.wallet.TestWalletProvider
 import io.github.adhopte.emrtdwallet.wallet.WalletRepository
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.io.File
@@ -24,6 +27,10 @@ class WalletApp : Application() {
         private set
     lateinit var repository: WalletRepository
         private set
+    lateinit var lock: WalletLock
+        private set
+    lateinit var activity: ActivityLog
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -33,6 +40,8 @@ class WalletApp : Application() {
         Security.insertProviderAt(BouncyCastleProvider(), 1)
 
         settings = AppSettings(this)
+        lock = WalletLock(this)
+        activity = ActivityLog(java.io.File(noBackupFilesDir, "activity.json"))
         val config = EudiWalletConfig()
             .configureDocumentManager(File(noBackupFilesDir, "pid-wallet.db").absolutePath)
             .configureLogging(level = Logger.LEVEL_INFO)
@@ -60,7 +69,8 @@ class WalletApp : Application() {
                 withSchemes("openid4vp", "eudi-openid4vp", "mdoc-openid4vp", "haip-vp")
                 withFormats(Format.MsoMdoc.ES256)
             }
-        wallet = EudiWallet(this, config)
-        repository = WalletRepository(this, wallet, IssuerApi { settings.issuerUrl })
+        val api = IssuerApi { settings.issuerUrl }
+        wallet = EudiWallet(this, config, TestWalletProvider(api) { lock.walletUnitId })
+        repository = WalletRepository(this, wallet, api, activity)
     }
 }
