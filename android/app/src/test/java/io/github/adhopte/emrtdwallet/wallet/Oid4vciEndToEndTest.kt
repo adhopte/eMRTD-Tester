@@ -23,6 +23,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -70,16 +71,24 @@ class Oid4vciEndToEndTest {
         val wallet = EudiWallet(ctx, config, TestWalletProvider(IssuerApi { issuer }) { "e2e-test" }) {
             withStorage(storage)
             withSecureAreas(listOf(secureArea))
+            // Robolectric has no Android Keystore for the client-attestation PoP key
+            withWalletKeyManager(eu.europa.ec.eudi.wallet.provider.SecureAreaWalletKeyManager(secureArea, { alg ->
+                SoftwareCreateKeySettings.Builder().setAlgorithm(alg).build()
+            }))
         }
-        val manager = wallet.createOpenId4VciManager(OfferController.managerConfig())
         val executor = Executors.newSingleThreadExecutor()
 
         val resolved = CompletableDeferred<OfferResult>()
-        manager.resolveDocumentOffer(offerUri, executor) { resolved.complete(it) }
+        wallet.createOpenId4VciManager(OfferController.managerConfig(false))
+            .resolveDocumentOffer(offerUri, executor) { resolved.complete(it) }
         val offer = (withTimeout(90_000) { resolved.await() } as? OfferResult.Success
             ?: error("offer not resolved: ${(resolved.await() as OfferResult.Failure).cause}")).offer
         assertEquals(3, offer.offeredDocuments.size)
         assertNotNull(offer.txCodeSpec)
+        // The backend advertises attest_jwt_client_auth, so this also exercises the Wallet
+        // Instance Attestation + PoP path the TEST Wallet Provider supports
+        assertTrue(OfferController.requiresClientAttestation(offer))
+        val manager = wallet.createOpenId4VciManager(OfferController.managerConfig(true))
 
         val finished = CompletableDeferred<List<String>>()
         val failures = mutableListOf<String>()

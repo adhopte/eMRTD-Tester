@@ -119,6 +119,11 @@ class IssuerApi(private val baseUrl: () -> String) {
         post("/wallet-provider/key-attestation", body.toString())
             .let { (json.parseToJsonElement(it) as JsonObject)["key_attestation"]!!.toString().trim('"') }
 
+    /** TEST Wallet Provider: Wallet Instance Attestation for OAuth attestation-based client authentication. */
+    suspend fun walletAttestation(body: JsonObject): String =
+        post("/wallet-provider/wallet-attestation", body.toString())
+            .let { (json.parseToJsonElement(it) as JsonObject)["wallet_attestation"]!!.toString().trim('"') }
+
     suspend fun issueFromEmrtd(req: EmrtdIssueRequest): IssueResponse =
         post("/api/v1/emrtd/issue", json.encodeToString(EmrtdIssueRequest.serializer(), req))
             .let { json.decodeFromString(IssueResponse.serializer(), it) }

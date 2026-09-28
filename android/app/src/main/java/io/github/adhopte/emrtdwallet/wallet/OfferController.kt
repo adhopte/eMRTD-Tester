@@ -56,12 +56,14 @@ class OfferController(
     private var offer: Offer? = null
     private var issuerName = ""
 
-    private val manager: OpenId4VciManager by lazy { wallet.createOpenId4VciManager(managerConfig()) }
+    private val publicManager: OpenId4VciManager by lazy { wallet.createOpenId4VciManager(managerConfig(false)) }
+    private val attestedManager: OpenId4VciManager by lazy { wallet.createOpenId4VciManager(managerConfig(true)) }
+    private var manager: OpenId4VciManager? = null
 
     fun resolve(uri: String) {
         offer = null
         _state.value = OfferState.Resolving
-        manager.resolveDocumentOffer(uri) { result ->
+        publicManager.resolveDocumentOffer(uri) { result ->
             when (result) {
                 is OfferResult.Success -> {
                     val o = result.offer
@@ -94,7 +96,9 @@ class OfferController(
         val failed = mutableListOf<String>()
         val deferred = mutableListOf<String>()
         _state.value = OfferState.Issuing(ctx.getString(R.string.offer_connecting_to, issuerName))
-        manager.issueDocumentByOffer(o, txCode?.takeIf { it.isNotBlank() }) { event ->
+        val m = if (requiresClientAttestation(o)) attestedManager else publicManager
+        manager = m
+        m.issueDocumentByOffer(o, txCode?.takeIf { it.isNotBlank() }) { event ->
             when (event) {
                 is IssueEvent.Started -> _state.value = OfferState.Issuing(ctx.getString(R.string.offer_requesting_n, event.total))
                 is IssueEvent.DocumentRequiresCreateSettings.OptionalReusePolicy -> {
@@ -152,7 +156,7 @@ class OfferController(
     }
 
     /** Authorization code flow: the browser redirected back to the wallet. */
-    fun resumeAuthorization(uri: Uri) = runCatching { manager.resumeWithAuthorization(uri) }
+    fun resumeAuthorization(uri: Uri) = runCatching { checkNotNull(manager).resumeWithAuthorization(uri) }
 
     private fun friendly(msg: String): String = when {
         "invalid_grant" in msg || "transaction code" in msg.lowercase() -> ctx.getString(R.string.offer_wrong_tx_code)
@@ -162,8 +166,20 @@ class OfferController(
     companion object {
         private const val TAG = "OfferController"
 
-        fun managerConfig(): OpenId4VciManager.Config = OpenId4VciManager.Config.Builder()
-            .withClientAuthenticationType(OpenId4VciManager.ClientAuthenticationType.None(CLIENT_ID))
+        /**
+         * Attestation-based client authentication (Wallet Instance Attestation + PoP) is used only
+         * with authorization servers that advertise it: openid4vci-kt refuses it otherwise, and
+         * servers that require it reject public clients with invalid_client.
+         */
+        fun requiresClientAttestation(offer: Offer): Boolean =
+            offer.credentialOffer.authorizationServerMetadata.tokenEndpointAuthMethods.orEmpty()
+                .any { it.value == "attest_jwt_client_auth" }
+
+        fun managerConfig(attestationBased: Boolean): OpenId4VciManager.Config = OpenId4VciManager.Config.Builder()
+            .withClientAuthenticationType(
+                if (attestationBased) OpenId4VciManager.ClientAuthenticationType.AttestationBased(CLIENT_ID)
+                else OpenId4VciManager.ClientAuthenticationType.None(CLIENT_ID)
+            )
             .withAuthFlowRedirectionURI(AUTH_REDIRECT)
             .withParUsage(OpenId4VciManager.Config.ParUsage.IF_SUPPORTED)
             // Encrypt credential responses whenever the issuer supports it, but do not

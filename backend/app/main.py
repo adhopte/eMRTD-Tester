@@ -435,7 +435,11 @@ def credential_offer_status(offer_id: str) -> dict:
 @app.post("/oid4vci/token")
 async def oid4vci_token(request: Request) -> JSONResponse:
     form = await request.form()
-    return JSONResponse(state.oid4vci.token({k: str(v) for k, v in form.items()}), headers=_NO_STORE)
+    return JSONResponse(state.oid4vci.token(
+        {k: str(v) for k, v in form.items()},
+        client_attestation=request.headers.get("OAuth-Client-Attestation"),
+        client_attestation_pop=request.headers.get("OAuth-Client-Attestation-PoP"),
+    ), headers=_NO_STORE)
 
 
 @app.post("/oid4vci/nonce")
@@ -585,6 +589,22 @@ def key_attestation(req: KeyAttestationRequest) -> dict:
     except (ValueError, KeyError) as e:
         raise HTTPException(400, f"cannot attest keys: {e}") from e
     return {"key_attestation": jwt}
+
+
+class WalletAttestationRequest(BaseModel):
+    jwk: dict = Field(description="public JWK (EC P-256) of the wallet's client-attestation PoP key")
+    client_id: str = Field(description="the OAuth client_id the wallet uses with issuers")
+    wallet_unit_id: str | None = None
+
+
+@app.post("/wallet-provider/wallet-attestation")
+def wallet_attestation(req: WalletAttestationRequest) -> dict:
+    try:
+        jwt = state.wallet_provider.wallet_attestation(
+            req.jwk, req.client_id, f"{get_settings().public_base_url}/wallet-provider")
+    except (ValueError, KeyError) as e:
+        raise HTTPException(400, f"cannot attest wallet: {e}") from e
+    return {"wallet_attestation": jwt}
 
 
 @app.get("/wallet-provider/certificate.pem", include_in_schema=False)

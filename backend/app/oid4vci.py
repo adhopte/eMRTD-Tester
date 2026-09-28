@@ -143,7 +143,11 @@ class Oid4vciIssuer:
             "token_endpoint": f"{self.issuer_id}/oid4vci/token",
             "response_types_supported": ["code"],
             "grant_types_supported": [PRE_AUTH_GRANT],
-            "token_endpoint_auth_methods_supported": ["none"],
+            # Public clients, or wallets presenting a Wallet Instance Attestation from the TEST
+            # Wallet Provider (draft-ietf-oauth-attestation-based-client-auth)
+            "token_endpoint_auth_methods_supported": ["none", "attest_jwt_client_auth"],
+            "client_attestation_signing_alg_values_supported": ["ES256"],
+            "client_attestation_pop_signing_alg_values_supported": ["ES256"],
             "pre-authorized_grant_anonymous_access_supported": True,
         }
 
@@ -193,7 +197,18 @@ class Oid4vciIssuer:
 
     # ------------------------------------------------------------------ token + nonce
 
-    def token(self, form: dict[str, str]) -> dict:
+    def token(self, form: dict[str, str], client_attestation: str | None = None,
+              client_attestation_pop: str | None = None) -> dict:
+        if client_attestation or client_attestation_pop:
+            if not (client_attestation and client_attestation_pop and self.wallet_provider):
+                raise OAuthError(401, "invalid_client", "client attestation and its PoP must be sent together")
+            try:
+                client_id = self.wallet_provider.verify_client_attestation(
+                    client_attestation, client_attestation_pop, self.issuer_id)
+            except (ValueError, KeyError) as e:
+                raise OAuthError(401, "invalid_client", f"invalid client attestation: {e}") from e
+            if form.get("client_id") not in (None, client_id):
+                raise OAuthError(401, "invalid_client", "client_id does not match the client attestation")
         if form.get("grant_type") != PRE_AUTH_GRANT:
             raise OAuthError(400, "unsupported_grant_type", "only the pre-authorized code grant is supported")
         code = form.get("pre-authorized_code") or ""

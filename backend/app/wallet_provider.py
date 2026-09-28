@@ -25,6 +25,9 @@ from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 from cryptography.x509.oid import NameOID
 
 KEY_ATTESTATION_TYP = "key-attestation+jwt"
+CLIENT_ATTESTATION_TYP = "oauth-client-attestation+jwt"
+CLIENT_ATTESTATION_POP_TYP = "oauth-client-attestation-pop+jwt"
+POP_MAX_SKEW_S = 300
 VALIDITY_S = 24 * 3600
 
 
@@ -88,6 +91,48 @@ class WalletProvider:
             payload["nonce"] = nonce
         header = {"typ": KEY_ATTESTATION_TYP, "alg": "ES256", "x5c": [base64.b64encode(self.cert_der).decode()]}
         return es256_sign(self.key, header, payload)
+
+    def wallet_attestation(self, jwk: dict, client_id: str, issuer: str) -> str:
+        """Wallet Instance Attestation for OAuth attestation-based client authentication
+        (draft-ietf-oauth-attestation-based-client-auth): binds the wallet's PoP key to its client_id."""
+        jwk_to_key(jwk)  # validates
+        if not client_id:
+            raise ValueError("client_id is required")
+        now = int(time.time())
+        payload = {
+            "iss": issuer,
+            "sub": client_id,
+            "iat": now, "exp": now + VALIDITY_S,
+            "cnf": {"jwk": {k: jwk[k] for k in ("kty", "crv", "x", "y")}},
+            "wallet_name": "getYourID Wallet (TEST)",
+            "wallet_link": "https://github.com/adhopte/eMRTD-Tester",
+        }
+        header = {"typ": CLIENT_ATTESTATION_TYP, "alg": "ES256", "x5c": [base64.b64encode(self.cert_der).decode()]}
+        return es256_sign(self.key, header, payload)
+
+    def verify_client_attestation(self, attestation: str, pop: str, audience: str) -> str:
+        """Check a Wallet Instance Attestation from this provider and its PoP; returns the client_id."""
+        header, claims = es256_verify(self.key.public_key(), attestation)
+        if header.get("typ") != CLIENT_ATTESTATION_TYP:
+            raise ValueError(f"client attestation typ must be {CLIENT_ATTESTATION_TYP}")
+        now = time.time()
+        if claims.get("exp", 0) < now:
+            raise ValueError("client attestation expired")
+        client_id = claims.get("sub")
+        cnf = (claims.get("cnf") or {}).get("jwk")
+        if not client_id or not isinstance(cnf, dict):
+            raise ValueError("client attestation lacks sub or cnf.jwk")
+        pop_header, pop_claims = es256_verify(jwk_to_key(cnf), pop)
+        if pop_header.get("typ") != CLIENT_ATTESTATION_POP_TYP:
+            raise ValueError(f"client attestation PoP typ must be {CLIENT_ATTESTATION_POP_TYP}")
+        aud = pop_claims.get("aud")
+        if audience not in (aud if isinstance(aud, list) else [aud]):
+            raise ValueError("client attestation PoP has the wrong audience")
+        if pop_claims.get("iss") not in (None, client_id):
+            raise ValueError("client attestation PoP iss does not match the attested client")
+        if not pop_claims.get("jti") or abs(now - pop_claims.get("iat", 0)) > POP_MAX_SKEW_S:
+            raise ValueError("client attestation PoP lacks jti or is not fresh")
+        return client_id
 
     def verify_key_attestation(self, jwt: str) -> dict:
         """Check a key attestation signed by this provider; returns its claims."""

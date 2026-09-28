@@ -214,3 +214,57 @@ def test_key_attestation_proofs(client, offer):
                     json={"credential_configuration_id": "eu.europa.ec.av.1",
                           "proofs": {"jwt": [attested_proof(keys[0], 0, fake, nonce)]}})
     assert r.status_code == 400 and "key attestation rejected" in r.json()["error_description"]
+
+
+def client_attestation_pop(key: ec.EllipticCurvePrivateKey, aud: str = ISSUER, client_id: str = "getyourid-wallet") -> str:
+    header = b64u(json.dumps({"typ": "oauth-client-attestation-pop+jwt", "alg": "ES256"}).encode())
+    payload = b64u(json.dumps({"iss": client_id, "aud": aud, "iat": int(time.time()), "jti": "t1"}).encode())
+    r, s = decode_dss_signature(key.sign(f"{header}.{payload}".encode(), ec.ECDSA(hashes.SHA256())))
+    return f"{header}.{payload}.{b64u(r.to_bytes(32, 'big') + s.to_bytes(32, 'big'))}"
+
+
+def wallet_attestation(client, key: ec.EllipticCurvePrivateKey, client_id: str = "getyourid-wallet") -> str:
+    nums = key.public_key().public_numbers()
+    jwk = {"kty": "EC", "crv": "P-256", "x": b64u(nums.x.to_bytes(32, "big")), "y": b64u(nums.y.to_bytes(32, "big"))}
+    r = client.post("/wallet-provider/wallet-attestation", json={"jwk": jwk, "client_id": client_id})
+    assert r.status_code == 200, r.text
+    return r.json()["wallet_attestation"]
+
+
+def token_with_attestation(client, offer: dict, attestation: str, pop: str):
+    grant = resolve(client, offer["credential_offer_uri"])["grants"]["urn:ietf:params:oauth:grant-type:pre-authorized_code"]
+    form = {"grant_type": "urn:ietf:params:oauth:grant-type:pre-authorized_code",
+            "pre-authorized_code": grant["pre-authorized_code"], "tx_code": offer["tx_code"]}
+    return client.post("/oid4vci/token", data=form,
+                       headers={"OAuth-Client-Attestation": attestation, "OAuth-Client-Attestation-PoP": pop})
+
+
+def test_attestation_based_client_auth_is_advertised(client):
+    asm = client.get("/.well-known/oauth-authorization-server").json()
+    assert asm["token_endpoint_auth_methods_supported"] == ["none", "attest_jwt_client_auth"]
+
+
+def test_attestation_based_client_auth_accepted(client, offer):
+    key = ec.generate_private_key(ec.SECP256R1())
+    r = token_with_attestation(client, offer, wallet_attestation(client, key), client_attestation_pop(key))
+    assert r.status_code == 200, r.text
+
+
+@pytest.mark.parametrize("case", ["wrong_pop_key", "wrong_audience", "foreign_attestation", "pop_missing"])
+def test_attestation_based_client_auth_rejected(client, offer, case):
+    key, other = ec.generate_private_key(ec.SECP256R1()), ec.generate_private_key(ec.SECP256R1())
+    attestation, pop = wallet_attestation(client, key), client_attestation_pop(key)
+    if case == "wrong_pop_key":
+        pop = client_attestation_pop(other)
+    elif case == "wrong_audience":
+        pop = client_attestation_pop(key, aud="https://elsewhere.example")
+    elif case == "foreign_attestation":
+        # same shape, but signed by a key that is not the TEST Wallet Provider's
+        h, p, _ = attestation.split(".")
+        r_, s_ = decode_dss_signature(other.sign(f"{h}.{p}".encode(), ec.ECDSA(hashes.SHA256())))
+        attestation = f"{h}.{p}.{b64u(r_.to_bytes(32, 'big') + s_.to_bytes(32, 'big'))}"
+    elif case == "pop_missing":
+        pop = ""
+    r = token_with_attestation(client, offer, attestation, pop)
+    assert r.status_code == 401, r.text
+    assert r.json()["error"] == "invalid_client"

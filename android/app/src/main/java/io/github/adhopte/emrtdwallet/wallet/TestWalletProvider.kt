@@ -11,26 +11,24 @@ import org.multipaz.crypto.EcPublicKeyDoubleCoordinate
 import org.multipaz.securearea.KeyInfo
 
 /**
- * Bridges wallet-core to the backend's TEST Wallet Provider, which attests the device keys
- * (Wallet Unit Attestation) that OpenID4VCI proofs must carry. Client authentication does not
- * use a Wallet Instance Attestation, so [getWalletAttestation] is not supported.
+ * Bridges wallet-core to the backend's TEST Wallet Provider, which signs the Wallet Instance
+ * Attestation used for OAuth attestation-based client authentication and attests the device keys
+ * (Wallet Unit Attestation) that OpenID4VCI proofs must carry.
  */
 class TestWalletProvider(private val api: IssuerApi, private val walletUnitId: () -> String) : WalletAttestationsProvider {
 
-    override suspend fun getWalletAttestation(keyInfo: KeyInfo): Result<String> =
-        Result.failure(UnsupportedOperationException("Wallet Instance Attestation is not used by this wallet"))
+    override suspend fun getWalletAttestation(keyInfo: KeyInfo): Result<String> = runCatching {
+        api.walletAttestation(
+            JsonObject(mapOf(
+                "jwk" to keyInfo.jwk(),
+                "client_id" to JsonPrimitive(OfferController.CLIENT_ID),
+                "wallet_unit_id" to JsonPrimitive(walletUnitId()),
+            ))
+        )
+    }
 
     override suspend fun getKeyAttestation(keys: List<KeyInfo>, nonce: Nonce?): Result<String> = runCatching {
-        val jwks = keys.map { info ->
-            val pub = info.publicKey as? EcPublicKeyDoubleCoordinate
-                ?: error("unsupported device key type ${info.publicKey::class.simpleName}")
-            JsonObject(mapOf(
-                "kty" to JsonPrimitive("EC"),
-                "crv" to JsonPrimitive("P-256"),
-                "x" to JsonPrimitive(pub.x.b64url()),
-                "y" to JsonPrimitive(pub.y.b64url()),
-            ))
-        }
+        val jwks = keys.map { it.jwk() }
         // Android Keystore attestation chains, recorded by the provider
         val chains = keys.map { info ->
             JsonArray(info.attestation.certChain?.certificates.orEmpty().map {
@@ -45,6 +43,17 @@ class TestWalletProvider(private val api: IssuerApi, private val walletUnitId: (
                 put("wallet_unit_id", JsonPrimitive(walletUnitId()))
             })
         )
+    }
+
+    private fun KeyInfo.jwk(): JsonObject {
+        val pub = publicKey as? EcPublicKeyDoubleCoordinate
+            ?: error("unsupported device key type ${publicKey::class.simpleName}")
+        return JsonObject(mapOf(
+            "kty" to JsonPrimitive("EC"),
+            "crv" to JsonPrimitive("P-256"),
+            "x" to JsonPrimitive(pub.x.b64url()),
+            "y" to JsonPrimitive(pub.y.b64url()),
+        ))
     }
 
     private fun ByteArray.b64url(): String = Base64.encodeToString(this, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)

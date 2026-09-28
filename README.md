@@ -86,6 +86,7 @@ The backend is also an **OpenID4VCI 1.0** issuer (`backend/app/oid4vci.py`) for 
 | `/oid4vci/token` | pre-authorized code + 6-digit **transaction code** (5 wrong codes revoke the offer) |
 | `/oid4vci/nonce`, `/oid4vci/credential` | `c_nonce`, then `mso_mdoc` credentials bound to the proof key |
 | `/wallet-provider/key-attestation` | **TEST Wallet Provider**: signs `key-attestation+jwt` for the wallet's device keys |
+| `/wallet-provider/wallet-attestation` | **TEST Wallet Provider**: signs the Wallet Instance Attestation (`oauth-client-attestation+jwt`) for attestation-based client authentication; the token endpoint verifies it and its PoP when sent |
 
 Credential types (`backend/app/attestations.py`), all ISO 18013-5 mdocs signed by the same Document Signer:
 - **PID** (`eu.europa.ec.eudi.pid.1`), with portrait.
@@ -106,7 +107,11 @@ In the app, **Scan** (bottom bar) reads any wallet QR code:
 - A credential offer opens *Add to wallet*: issuer, offered credentials, and the transaction-code field if one is needed.
 - An OpenID4VP request opens the consent screen.
 - *Paste a link* covers links received by e-mail or chat.
-- Offers from other OpenID4VCI issuers work too, as long as they accept a public client and don't require their own wallet attestation.
+- Offers from other OpenID4VCI issuers work too. The wallet picks client authentication per issuer from its authorization server metadata:
+  - `attest_jwt_client_auth` advertised → **attestation-based client authentication**: a Wallet Instance Attestation (`oauth-client-attestation+jwt`) from the TEST Wallet Provider, plus a PoP signed by a wallet key in the Android Keystore.
+  - otherwise → public client (`client_id=getyourid-wallet`).
+
+  An issuer that checks *who* signed the attestation must trust the TEST Wallet Provider certificate (`GET /wallet-provider/certificate.pem`); otherwise it answers `invalid_client`.
 
 `android/app/src/test/.../Oid4vciEndToEndTest.kt` runs wallet-core's own `OpenId4VciManager` against a live backend: offer, transaction code, key attestation, three credentials stored.
 
