@@ -18,6 +18,7 @@ import eu.europa.ec.eudi.wallet.issue.openid4vci.IssueEvent
 import eu.europa.ec.eudi.wallet.issue.openid4vci.Offer
 import eu.europa.ec.eudi.wallet.issue.openid4vci.OfferResult
 import eu.europa.ec.eudi.wallet.issue.openid4vci.OpenId4VciManager
+import io.github.adhopte.emrtdwallet.R
 import io.github.adhopte.emrtdwallet.data.ActivityLog
 import io.github.adhopte.emrtdwallet.data.ActivityType
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,10 +44,12 @@ sealed interface OfferState {
  * the authorization code flow and store the issued credentials.
  */
 class OfferController(
+    context: android.content.Context,
     private val wallet: EudiWallet,
     private val activity: ActivityLog,
     private val onIssued: () -> Unit,
 ) {
+    private val ctx = context.applicationContext
     private val _state = MutableStateFlow<OfferState>(OfferState.Idle)
     val state: StateFlow<OfferState> = _state.asStateFlow()
 
@@ -65,21 +68,21 @@ class OfferController(
                     offer = o
                     issuerName = o.issuerMetadata.display.firstOrNull()?.name
                         ?: runCatching { Uri.parse(o.issuerMetadata.credentialIssuerIdentifier.toString()).host }.getOrNull()
-                        ?: "Issuer"
+                        ?: ctx.getString(R.string.issuer_label_default)
                     val items = o.offeredDocuments.map { d ->
                         val docType = when (val f = d.documentFormat) {
                             is MsoMdocFormat -> f.docType
                             is SdJwtVcFormat -> f.vct
                             else -> ""
                         }
-                        OfferedItem(d.configuration.credentialMetadata?.display?.firstOrNull()?.name ?: docTypeName(docType), docType)
+                        OfferedItem(d.configuration.credentialMetadata?.display?.firstOrNull()?.name ?: docTypeName(docType, ctx), docType)
                     }
                     val tx = o.txCodeSpec?.let { TxCodeSpec(it.inputMode == TxCodeInputMode.NUMERIC, it.length, it.description) }
                     _state.value = OfferState.Ready(issuerName, items, tx)
                 }
                 is OfferResult.Failure -> {
                     Log.w(TAG, "offer resolution failed", result.cause)
-                    _state.value = OfferState.Failed("Could not read the credential offer: ${result.cause.message ?: result.cause}")
+                    _state.value = OfferState.Failed(ctx.getString(R.string.offer_could_not_read, result.cause.message ?: result.cause.toString()))
                 }
             }
         }
@@ -90,10 +93,10 @@ class OfferController(
         val issued = mutableListOf<String>()
         val failed = mutableListOf<String>()
         val deferred = mutableListOf<String>()
-        _state.value = OfferState.Issuing("Connecting to $issuerName…")
+        _state.value = OfferState.Issuing(ctx.getString(R.string.offer_connecting_to, issuerName))
         manager.issueDocumentByOffer(o, txCode?.takeIf { it.isNotBlank() }) { event ->
             when (event) {
-                is IssueEvent.Started -> _state.value = OfferState.Issuing("Requesting ${event.total} credential(s)…")
+                is IssueEvent.Started -> _state.value = OfferState.Issuing(ctx.getString(R.string.offer_requesting_n, event.total))
                 is IssueEvent.DocumentRequiresCreateSettings.OptionalReusePolicy -> {
                     // One credential, reused for every presentation
                     event.resume(
@@ -110,7 +113,7 @@ class OfferController(
                 is IssueEvent.DocumentRequiresUserAuth -> event.cancel("device keys do not require user authentication")
                 is IssueEvent.DocumentIssued -> {
                     issued += event.name
-                    _state.value = OfferState.Issuing("Stored ${event.name}")
+                    _state.value = OfferState.Issuing(ctx.getString(R.string.offer_stored_n, event.name))
                 }
                 is IssueEvent.DocumentFailed -> {
                     Log.w(TAG, "document failed", event.cause)
@@ -121,7 +124,7 @@ class OfferController(
                 is IssueEvent.Failure -> {
                     Log.w(TAG, "issuance failed", event.cause)
                     val msg = event.cause.message ?: event.cause.toString()
-                    activity.add(ActivityType.ISSUANCE_FAILED, "Issuance failed", msg, issuerName)
+                    activity.add(ActivityType.ISSUANCE_FAILED, ctx.getString(R.string.activity_issuance_failed), msg, issuerName)
                     _state.value = OfferState.Failed(friendly(msg))
                 }
                 else -> Log.d(TAG, "issue event $event")
@@ -131,13 +134,15 @@ class OfferController(
 
     private fun finish(issued: List<String>, failed: List<String>, deferred: List<String>) {
         onIssued()
-        if (issued.isNotEmpty()) activity.add(ActivityType.ISSUED, "Added ${issued.joinToString()}", "OpenID4VCI", issuerName, issued)
-        if (failed.isNotEmpty()) activity.add(ActivityType.ISSUANCE_FAILED, "Issuance failed", failed.joinToString("\n"), issuerName)
+        if (issued.isNotEmpty()) activity.add(ActivityType.ISSUED, ctx.getString(R.string.activity_added_n, issued.joinToString()),
+            "OpenID4VCI", issuerName, issued)
+        if (failed.isNotEmpty()) activity.add(ActivityType.ISSUANCE_FAILED, ctx.getString(R.string.activity_issuance_failed),
+            failed.joinToString("\n"), issuerName)
         _state.value = OfferState.Done(issuerName, issued, failed, deferred)
     }
 
     fun decline() {
-        if (_state.value is OfferState.Ready) activity.add(ActivityType.ISSUANCE_REJECTED, "Declined credential offer", "", issuerName)
+        if (_state.value is OfferState.Ready) activity.add(ActivityType.ISSUANCE_REJECTED, ctx.getString(R.string.activity_declined_offer), "", issuerName)
         reset()
     }
 
@@ -150,8 +155,7 @@ class OfferController(
     fun resumeAuthorization(uri: Uri) = runCatching { manager.resumeWithAuthorization(uri) }
 
     private fun friendly(msg: String): String = when {
-        "invalid_grant" in msg || "transaction code" in msg.lowercase() ->
-            "The issuer did not accept the code (wrong transaction code, or the offer was already used / expired)."
+        "invalid_grant" in msg || "transaction code" in msg.lowercase() -> ctx.getString(R.string.offer_wrong_tx_code)
         else -> msg
     }
 
@@ -185,10 +189,10 @@ class OfferController(
     }
 }
 
-fun docTypeName(docType: String): String = when (docType) {
-    PID_DOCTYPE -> "Person Identification Data"
-    "org.iso.23220.photoID.1" -> "Photo ID"
-    "eu.europa.ec.av.1" -> "Age verification"
-    "org.iso.18013.5.1.mDL" -> "Mobile driving licence"
+fun docTypeName(docType: String, context: android.content.Context): String = when (docType) {
+    PID_DOCTYPE -> context.getString(R.string.badge_pid_full_name)
+    "org.iso.23220.photoID.1" -> context.getString(R.string.namespace_photo_id)
+    "eu.europa.ec.av.1" -> context.getString(R.string.doctype_age_verification)
+    "org.iso.18013.5.1.mDL" -> context.getString(R.string.doctype_mdl)
     else -> docType.substringAfterLast('.').ifBlank { docType }
 }

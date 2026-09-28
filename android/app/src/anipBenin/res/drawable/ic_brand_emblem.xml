@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generic national-ID emblem in the colors of Bénin's flag (green/gold/red). This is an
+     original abstract design (a card-in-a-badge motif), not a reproduction of any specific
+     ANIP logo asset — ANIP has no separately published brand palette we could source, and this
+     is a TEST-only demo skin (see app/src/anipBenin/res/values/strings.xml: "(TEST)"). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp" android:height="48dp"
+    android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#FF008850" android:pathData="M24,0 A24,24 0 1,1 24,48 A24,24 0 1,1 24,0 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M13,16 L35,16 L38,19 L38,31 L35,34 L13,34 L10,31 L10,19 Z" />
+    <path android:fillColor="#FFD9A404" android:pathData="M17,21 A4,4 0 1,1 17,29 A4,4 0 1,1 17,21 Z" />
+    <path android:fillColor="#FF008850" android:pathData="M23,20 L35,20 L35,22 L23,22 Z" />
+    <path android:fillColor="#FF008850" android:pathData="M23,24 L32,24 L32,26 L23,26 Z" />
+    <path android:fillColor="#FFE90929" android:pathData="M13,30 L35,30 L35,32 L13,32 Z" />
+</vector>

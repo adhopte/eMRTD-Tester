@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.QrCode
@@ -54,6 +55,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -118,55 +120,73 @@ fun IssuedDocument.holderName(): String? {
     return listOfNotNull(given, family).joinToString(" ").ifBlank { null }
 }
 
+@Composable
 fun IssuedDocument.expiryText(): String =
-    firstClaim("date_of_expiry", "expiry_date")?.let(::formatValue)
+    firstClaim("date_of_expiry", "expiry_date")?.let { formatValue(it) }
         ?: runCatching { DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneId.systemDefault()).format(validUntil) }.getOrDefault("—")
 
 data class DocStyle(val badge: String, val gradient: List<Color>, val icon: ImageVector)
 
+@Composable
 fun docStyle(docType: String): DocStyle = when (docType) {
-    "eu.europa.ec.eudi.pid.1" -> DocStyle("PID", listOf(InGroupe.Navy, InGroupe.MediumBlue), Icons.Filled.Badge)
-    "org.iso.23220.photoID.1" -> DocStyle("PHOTO ID", listOf(InGroupe.MediumBlue, InGroupe.SkyBlue), Icons.Filled.Badge)
-    "eu.europa.ec.av.1" -> DocStyle("AGE 18+", listOf(InGroupe.DarkRed, InGroupe.Red), Icons.Filled.Lock)
-    "org.iso.18013.5.1.mDL" -> DocStyle("mDL", listOf(Color(0xFF0B5E52), Color(0xFF1A9E8A)), Icons.Filled.Badge)
-    else -> DocStyle("ATTESTATION", listOf(Color(0xFF3B4A7A), Color(0xFF6D7DB3)), Icons.Filled.Badge)
+    "eu.europa.ec.eudi.pid.1" -> DocStyle(stringResource(R.string.badge_pid), listOf(Brand.Navy, Brand.MediumBlue), Icons.Filled.Badge)
+    "org.iso.23220.photoID.1" -> DocStyle(stringResource(R.string.badge_photo_id), listOf(Brand.MediumBlue, Brand.SkyBlue), Icons.Filled.Badge)
+    "eu.europa.ec.av.1" -> DocStyle(stringResource(R.string.badge_age_18), listOf(Brand.DarkRed, Brand.Red), Icons.Filled.Lock)
+    "org.iso.18013.5.1.mDL" -> DocStyle(stringResource(R.string.badge_mdl), listOf(Color(0xFF0B5E52), Color(0xFF1A9E8A)), Icons.Filled.Badge)
+    else -> DocStyle(stringResource(R.string.badge_attestation), listOf(Color(0xFF3B4A7A), Color(0xFF6D7DB3)), Icons.Filled.Badge)
 }
 
-private val CLAIM_LABELS = mapOf(
-    "family_name" to "Family name", "given_name" to "Given names", "birth_date" to "Date of birth",
-    "family_name_unicode" to "Family name", "given_name_unicode" to "Given names",
-    "place_of_birth" to "Place of birth", "birth_place" to "Place of birth", "nationality" to "Nationality",
-    "sex" to "Sex", "resident_address" to "Address", "personal_administrative_number" to "Personal number",
-    "age_over_18" to "Over 18", "age_over_21" to "Over 21", "age_in_years" to "Age", "age_birth_year" to "Year of birth",
-    "issuing_authority" to "Issued by", "issuing_authority_unicode" to "Issued by", "issuing_country" to "Issuing country",
-    "document_number" to "Document number", "travel_document_number" to "Travel document number",
-    "person_id" to "Personal number", "date_of_issuance" to "Issue date", "date_of_expiry" to "Expiry date",
-    "issuance_date" to "Issue date (legacy)", "expiry_date" to "Expiry date", "issue_date" to "Issue date",
-    "evidence_type" to "Evidence", "source_document_type" to "Source document", "source_document_issuing_state" to "Document country",
-    "source_document_expiry" to "Document expiry", "verification_checks" to "Checks",
-    "dtc_version" to "DTC version", "dtc_sod" to "eMRTD security object", "dtc_dg1" to "eMRTD DG1", "dtc_dg2" to "eMRTD DG2",
+@Composable
+private fun claimLabelsMap(): Map<String, String> = mapOf(
+    "family_name" to stringResource(R.string.claim_family_name), "given_name" to stringResource(R.string.claim_given_names),
+    "birth_date" to stringResource(R.string.claim_birth_date),
+    "family_name_unicode" to stringResource(R.string.claim_family_name), "given_name_unicode" to stringResource(R.string.claim_given_names),
+    "place_of_birth" to stringResource(R.string.claim_place_of_birth), "birth_place" to stringResource(R.string.claim_place_of_birth),
+    "nationality" to stringResource(R.string.claim_nationality),
+    "sex" to stringResource(R.string.claim_sex), "resident_address" to stringResource(R.string.claim_address),
+    "personal_administrative_number" to stringResource(R.string.claim_personal_number),
+    "age_over_18" to stringResource(R.string.claim_over_18), "age_over_21" to stringResource(R.string.claim_over_21),
+    "age_in_years" to stringResource(R.string.claim_age), "age_birth_year" to stringResource(R.string.claim_year_of_birth),
+    "issuing_authority" to stringResource(R.string.claim_issued_by), "issuing_authority_unicode" to stringResource(R.string.claim_issued_by),
+    "issuing_country" to stringResource(R.string.claim_issuing_country),
+    "document_number" to stringResource(R.string.claim_document_number), "travel_document_number" to stringResource(R.string.claim_travel_document_number),
+    "person_id" to stringResource(R.string.claim_personal_number), "date_of_issuance" to stringResource(R.string.claim_issue_date),
+    "date_of_expiry" to stringResource(R.string.claim_expiry_date),
+    "issuance_date" to stringResource(R.string.claim_issue_date_legacy), "expiry_date" to stringResource(R.string.claim_expiry_date),
+    "issue_date" to stringResource(R.string.claim_issue_date),
+    "evidence_type" to stringResource(R.string.claim_evidence), "source_document_type" to stringResource(R.string.claim_source_document),
+    "source_document_issuing_state" to stringResource(R.string.claim_document_country),
+    "source_document_expiry" to stringResource(R.string.claim_document_expiry), "verification_checks" to stringResource(R.string.claim_checks),
+    "dtc_version" to stringResource(R.string.claim_dtc_version), "dtc_sod" to stringResource(R.string.claim_dtc_sod),
+    "dtc_dg1" to stringResource(R.string.claim_dtc_dg1), "dtc_dg2" to stringResource(R.string.claim_dtc_dg2),
 )
 
-private val NAMESPACE_LABELS = mapOf(
-    "eu.europa.ec.eudi.pid.1" to "Identity",
-    "org.emrtd-tester.evidence.1" to "How it was verified",
-    "org.iso.23220.1" to "Identity",
-    "org.iso.23220.photoID.1" to "Photo ID",
-    "org.iso.23220.dtc.1" to "Digital Travel Credential (chip data)",
-    "eu.europa.ec.av.1" to "Age",
+@Composable
+private fun namespaceLabelsMap(): Map<String, String> = mapOf(
+    "eu.europa.ec.eudi.pid.1" to stringResource(R.string.namespace_identity),
+    "org.emrtd-tester.evidence.1" to stringResource(R.string.namespace_how_verified),
+    "org.iso.23220.1" to stringResource(R.string.namespace_identity),
+    "org.iso.23220.photoID.1" to stringResource(R.string.namespace_photo_id),
+    "org.iso.23220.dtc.1" to stringResource(R.string.namespace_dtc),
+    "eu.europa.ec.av.1" to stringResource(R.string.namespace_age),
 )
 
-fun claimLabel(name: String): String =
-    CLAIM_LABELS[name] ?: Regex("age_over_(\\d+)").matchEntire(name)?.let { "Over ${it.groupValues[1]}" }
-    ?: name.replace('_', ' ').replaceFirstChar { it.uppercase() }
+@Composable
+fun claimLabel(name: String): String {
+    val over = Regex("age_over_(\\d+)").matchEntire(name)
+    return claimLabelsMap()[name]
+        ?: over?.let { stringResource(R.string.claim_over_n, it.groupValues[1]) }
+        ?: name.replace('_', ' ').replaceFirstChar { it.uppercase() }
+}
 
+@Composable
 fun formatValue(v: Any?): String = when (v) {
     null -> "—"
-    is ByteArray -> "${v.size} bytes"
-    is Boolean -> if (v) "Yes" else "No"
-    is Map<*, *> -> v.entries.joinToString(", ") { "${it.key}: ${formatValue(it.value)}" }
-    is Collection<*> -> v.joinToString(", ") { formatValue(it) }
-    is String -> if (v.length > 120 && v.none { it == ' ' }) "${v.length * 3 / 4} bytes (binary)" else v
+    is ByteArray -> stringResource(R.string.value_bytes, v.size)
+    is Boolean -> stringResource(if (v) R.string.value_yes else R.string.value_no)
+    is Map<*, *> -> v.entries.map { "${it.key}: ${formatValue(it.value)}" }.joinToString(", ")
+    is Collection<*> -> v.map { formatValue(it) }.joinToString(", ")
+    is String -> if (v.length > 120 && v.none { it == ' ' }) stringResource(R.string.value_bytes_binary, v.length * 3 / 4) else v
     else -> v.toString()
 }
 
@@ -180,10 +200,10 @@ fun BrandTopBar(actions: @Composable () -> Unit = {}) {
     TopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(painterResource(R.drawable.ic_ingroupe_emblem), null, Modifier.size(32.dp))
+                Image(painterResource(R.drawable.ic_brand_emblem), null, Modifier.size(32.dp))
                 Column(Modifier.padding(start = 10.dp)) {
                     Text(stringResource(R.string.app_name), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    Text("by IN Groupe", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                    Text(stringResource(R.string.brand_tagline), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
                 }
             }
         },
@@ -198,7 +218,7 @@ fun SimpleTopBar(title: String, onBack: (() -> Unit)? = null, actions: @Composab
         title = { Text(title) },
         navigationIcon = {
             if (onBack != null) IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
             }
         },
         actions = { actions() },
@@ -224,18 +244,18 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             BrandTopBar(actions = {
-                IconButton(onClick = onHelp) { Icon(Icons.AutoMirrored.Filled.HelpOutline, "How it works") }
+                IconButton(onClick = onHelp) { Icon(Icons.AutoMirrored.Filled.HelpOutline, stringResource(R.string.settings_how_it_works)) }
             })
         },
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(tab == HomeTab.WALLET, { tab = HomeTab.WALLET },
-                    icon = { Icon(Icons.Filled.Wallet, null) }, label = { Text("Wallet") })
-                NavigationBarItem(false, onScan, icon = { Icon(Icons.Filled.QrCodeScanner, null) }, label = { Text("Scan") })
+                    icon = { Icon(Icons.Filled.Wallet, null) }, label = { Text(stringResource(R.string.nav_wallet)) })
+                NavigationBarItem(false, onScan, icon = { Icon(Icons.Filled.QrCodeScanner, null) }, label = { Text(stringResource(R.string.nav_scan)) })
                 NavigationBarItem(false, { if (docs.isEmpty()) noDocs = true else onShowQr() },
-                    icon = { Icon(Icons.Filled.QrCode, null) }, label = { Text("Show QR") })
+                    icon = { Icon(Icons.Filled.QrCode, null) }, label = { Text(stringResource(R.string.nav_show_qr)) })
                 NavigationBarItem(tab == HomeTab.SETTINGS, { tab = HomeTab.SETTINGS },
-                    icon = { Icon(Icons.Filled.Settings, null) }, label = { Text("Settings") })
+                    icon = { Icon(Icons.Filled.Settings, null) }, label = { Text(stringResource(R.string.nav_settings)) })
             }
         },
     ) { padding ->
@@ -248,10 +268,10 @@ fun HomeScreen(
     }
     if (noDocs) AlertDialog(
         onDismissRequest = { noDocs = false },
-        title = { Text("Nothing to share yet") },
-        text = { Text("Add your PID first, then show the QR code to a verifier in person.") },
-        confirmButton = { TextButton(onClick = { noDocs = false; onAdd() }) { Text("Add PID") } },
-        dismissButton = { TextButton(onClick = { noDocs = false }) { Text("Later") } },
+        title = { Text(stringResource(R.string.dialog_nothing_to_share_title)) },
+        text = { Text(stringResource(R.string.dialog_nothing_to_share_body)) },
+        confirmButton = { TextButton(onClick = { noDocs = false; onAdd() }) { Text(stringResource(R.string.action_add_pid)) } },
+        dismissButton = { TextButton(onClick = { noDocs = false }) { Text(stringResource(R.string.action_later)) } },
     )
 }
 
@@ -270,16 +290,25 @@ private fun WalletTab(
     ) {
         item {
             Column(Modifier.padding(top = 4.dp)) {
-                Text(if (holder != null) "Hello, ${holder.substringBefore(' ').lowercase().replaceFirstChar { it.uppercase() }}"
-                    else "Welcome", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text(if (docs.isEmpty()) "Let's add your first credential" else "${docs.size} credential(s) in your wallet",
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                Text(
+                    if (holder != null) stringResource(R.string.home_greeting_hello,
+                        holder.substringBefore(' ').lowercase().replaceFirstChar { it.uppercase() })
+                    else stringResource(R.string.home_greeting_welcome),
+                    style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    if (docs.isEmpty()) stringResource(R.string.home_subtitle_empty)
+                    else stringResource(R.string.home_subtitle_count, docs.size),
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                )
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                QuickAction(Icons.Filled.QrCodeScanner, "Scan QR", "Share online · Get credentials", Modifier.weight(1f), onScan)
-                QuickAction(Icons.Filled.QrCode, "Show QR", "Share in person", Modifier.weight(1f), onShowQr, enabled = docs.isNotEmpty())
+                QuickAction(Icons.Filled.QrCodeScanner, stringResource(R.string.quick_scan_title),
+                    stringResource(R.string.quick_scan_subtitle), Modifier.weight(1f), onScan)
+                QuickAction(Icons.Filled.QrCode, stringResource(R.string.quick_show_qr_title),
+                    stringResource(R.string.quick_show_qr_subtitle), Modifier.weight(1f), onShowQr, enabled = docs.isNotEmpty())
             }
         }
         if (docs.isEmpty()) {
@@ -295,8 +324,8 @@ private fun WalletTab(
                 Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Add, null, tint = MaterialTheme.colorScheme.primary)
                     Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                        Text("Add a document", fontWeight = FontWeight.SemiBold)
-                        Text("Passport / ID card, or a credential offer from an issuer", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.add_document_title), fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.add_document_subtitle), style = MaterialTheme.typography.bodySmall)
                     }
                     Icon(Icons.Filled.ChevronRight, null)
                 }
@@ -314,7 +343,7 @@ private fun QuickAction(icon: ImageVector, title: String, subtitle: String, modi
         elevation = CardDefaults.cardElevation(2.dp),
     ) {
         Column(Modifier.padding(14.dp)) {
-            Box(Modifier.size(40.dp).clip(CircleShape).background(InGroupe.Blue), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(40.dp).clip(CircleShape).background(Brand.Blue), contentAlignment = Alignment.Center) {
                 Icon(icon, null, tint = Color.White)
             }
             Text(title, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 10.dp))
@@ -327,12 +356,11 @@ private fun QuickAction(icon: ImageVector, title: String, subtitle: String, modi
 private fun EmptyWallet(onAdd: () -> Unit) {
     Card(Modifier.fillMaxWidth().clickable(onClick = onAdd), shape = RoundedCornerShape(24.dp)) {
         Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Image(painterResource(R.drawable.logo_ingroupe), "IN Groupe", Modifier.height(64.dp))
+            BrandLockup(emblemSize = 48.dp)
             Spacer(Modifier.height(12.dp))
-            Text("Your wallet is empty", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.wallet_empty_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(
-                "Get your Person Identification Data (PID) from your passport or ID card — with the chip for the " +
-                    "highest assurance — then share it with websites and verifiers.",
+                stringResource(R.string.wallet_empty_body),
                 style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 6.dp),
             )
         }
@@ -353,14 +381,14 @@ fun DocumentCard(doc: IssuedDocument, onClick: () -> Unit) {
     ) {
         Box(Modifier.fillMaxSize().background(Brush.linearGradient(style.gradient))) {
             Image(
-                painterResource(R.drawable.ic_ingroupe_emblem), null,
+                painterResource(R.drawable.ic_brand_emblem), null,
                 Modifier.size(170.dp).align(Alignment.CenterEnd).offset(x = 50.dp).alpha(0.14f),
             )
             Column(Modifier.fillMaxSize().padding(18.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(painterResource(R.drawable.ic_ingroupe_emblem), null, Modifier.size(26.dp))
+                    Image(painterResource(R.drawable.ic_brand_emblem), null, Modifier.size(26.dp))
                     Column(Modifier.padding(start = 8.dp).weight(1f)) {
-                        Text(docTypeName(doc.docType), color = Color.White, style = MaterialTheme.typography.labelLarge,
+                        Text(docTypeName(doc.docType, LocalContext.current), color = Color.White, style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(doc.issuerLabel(), color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
                     }
@@ -377,17 +405,17 @@ fun DocumentCard(doc: IssuedDocument, onClick: () -> Unit) {
                         if (doc.docType == "eu.europa.ec.av.1") {
                             val over = claims.values.flatMap { it.entries }.filter { it.key.startsWith("age_over_") && it.value == true }
                                 .map { it.key.removePrefix("age_over_").toInt() }.maxOrNull()
-                            Text(if (over != null) "Over $over" else "Age verified", color = Color.White,
-                                style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                            Text("No name or photo is shared", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
+                            Text(if (over != null) stringResource(R.string.doc_over_label, over) else stringResource(R.string.doc_age_verified),
+                                color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.doc_no_name_photo), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
                         } else {
                             Text(name ?: doc.name, color = Color.White, style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             doc.firstClaimText("birth_date")?.let {
-                                Text("Born $it", color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodySmall)
+                                Text(stringResource(R.string.doc_born, it), color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodySmall)
                             }
                         }
-                        Text("Valid until ${doc.expiryText()}", color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.doc_valid_until, doc.expiryText()), color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -395,27 +423,30 @@ fun DocumentCard(doc: IssuedDocument, onClick: () -> Unit) {
     }
 }
 
-private fun IssuedDocument.firstClaimText(name: String): String? = firstClaim(name)?.let(::formatValue)
+@Composable
+private fun IssuedDocument.firstClaimText(name: String): String? = firstClaim(name)?.let { formatValue(it) }
 
+@Composable
 private fun IssuedDocument.issuerLabel(): String {
     val ev = claims()["org.emrtd-tester.evidence.1"]?.get("evidence_type")?.toString()
     val source = when (ev) {
-        "emrtd_chip" -> " · from chip"
-        "document_image" -> " · from document scan"
-        "manual_entry_unverified" -> " · test data"
+        "emrtd_chip" -> stringResource(R.string.issuer_source_chip)
+        "document_image" -> stringResource(R.string.issuer_source_scan)
+        "manual_entry_unverified" -> stringResource(R.string.issuer_source_test)
         else -> ""
     }
+    val brandName = stringResource(R.string.brand_short_name)
     val authority = firstClaim("issuing_authority", "issuing_authority_unicode")?.toString()
-    return (authority?.let { if ("IN Groupe" in it) "IN Groupe" else it } ?: "Issuer") + source
+    return (authority?.let { if (brandName in it) brandName else it } ?: stringResource(R.string.issuer_label_default)) + source
 }
 
 @Composable
 fun Portrait(bytes: ByteArray?, sizeDp: Int) {
     val bmp = remember(bytes) { bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) } }
     Box(Modifier.size(width = (sizeDp * 0.8).dp, height = sizeDp.dp), contentAlignment = Alignment.Center) {
-        if (bmp != null) Image(bmp.asImageBitmap(), contentDescription = "Portrait", contentScale = ContentScale.Crop,
+        if (bmp != null) Image(bmp.asImageBitmap(), contentDescription = stringResource(R.string.content_desc_portrait), contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize())
-        else Icon(Icons.Filled.Badge, null, Modifier.size((sizeDp * 0.6).dp), tint = InGroupe.Grey)
+        else Icon(Icons.Filled.Badge, null, Modifier.size((sizeDp * 0.6).dp), tint = Brand.Grey)
     }
 }
 
@@ -427,44 +458,41 @@ fun Portrait(bytes: ByteArray?, sizeDp: Int) {
 fun AddPidScreen(vm: MainViewModel, onChip: () -> Unit, onScan: () -> Unit, onQr: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val nfc = rememberNfcStatus()
-    Scaffold(topBar = { SimpleTopBar("Add a document", onBack) }) { padding ->
+    Scaffold(topBar = { SimpleTopBar(stringResource(R.string.add_document_title), onBack) }) { padding ->
         Column(Modifier.padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("Get your PID", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.section_get_your_pid), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             OptionCard(
                 icon = Icons.Filled.Nfc,
-                title = "Passport / ID card with chip",
-                badge = "Highest assurance",
-                body = when (nfc) {
-                    NfcStatus.UNAVAILABLE -> "Not available: this phone has no NFC reader."
-                    NfcStatus.DISABLED -> "Scan the MRZ, read the chip, take a selfie. NFC is off — tap to turn it on."
-                    else -> "Scan the MRZ, hold the document to the phone, then take a live selfie. The issuer checks " +
-                        "Passive, Active and Chip Authentication and matches your face with the chip photo."
-                },
+                title = stringResource(R.string.option_chip_title),
+                badge = stringResource(R.string.option_chip_badge),
+                body = stringResource(when (nfc) {
+                    NfcStatus.UNAVAILABLE -> R.string.option_chip_body_unavailable
+                    NfcStatus.DISABLED -> R.string.option_chip_body_disabled
+                    else -> R.string.option_chip_body_enabled
+                }),
                 enabled = nfc != NfcStatus.UNAVAILABLE,
                 onClick = { if (nfc == NfcStatus.DISABLED) openNfcSettings(context) else onChip() },
             )
             OptionCard(
                 icon = Icons.Filled.CameraAlt,
-                title = "Scan document images",
-                badge = "No chip needed",
-                body = "Photograph or upload the data page (and the back of ID cards), then take a live selfie. " +
-                    "The issuer checks the images, the MRZ and your face.",
+                title = stringResource(R.string.option_scan_title),
+                badge = stringResource(R.string.option_scan_badge),
+                body = stringResource(R.string.option_scan_body),
                 onClick = onScan,
             )
-            Text("Other credentials", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+            Text(stringResource(R.string.section_other_credentials), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(top = 8.dp))
             OptionCard(
                 icon = Icons.Filled.QrCodeScanner,
-                title = "Scan an issuer's QR code",
-                body = "Add a PID or attestation (photo ID, age verification…) offered by an issuer through " +
-                    "OpenID4VCI. You may need the transaction code the issuer gives you.",
+                title = stringResource(R.string.option_offer_title),
+                body = stringResource(R.string.option_offer_body),
                 onClick = onQr,
             )
             OptionCard(
                 icon = Icons.Filled.Cloud,
-                title = "Open the IN Groupe issuer portal",
-                body = "Create a credential offer QR code in a browser (on a computer, then scan it here).",
+                title = stringResource(R.string.issuer_portal_menu_title),
+                body = stringResource(R.string.option_portal_body),
                 trailing = Icons.AutoMirrored.Filled.OpenInNew,
                 onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(vm.settings.issuerUrl + "/issuer"))) },
             )
@@ -498,7 +526,7 @@ private fun OptionCard(
                         modifier = Modifier.weight(1f, fill = false))
                     badge?.let {
                         Text(it, style = MaterialTheme.typography.labelSmall, color = Color.White,
-                            modifier = Modifier.padding(start = 8.dp).background(InGroupe.Red, RoundedCornerShape(6.dp))
+                            modifier = Modifier.padding(start = 8.dp).background(Brand.Red, RoundedCornerShape(6.dp))
                                 .padding(horizontal = 6.dp, vertical = 1.dp))
                     }
                 }
@@ -519,12 +547,12 @@ fun DocumentScreen(vm: MainViewModel, id: String, onShowQr: () -> Unit, onBack: 
     var confirmDelete by remember { mutableStateOf(false) }
     val auth = rememberAuthenticator(vm.lock, forSharing = false)
     Scaffold(topBar = {
-        SimpleTopBar(doc?.let { docTypeName(it.docType) } ?: "Document", onBack) {
-            IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Filled.Delete, "Delete") }
+        SimpleTopBar(doc?.let { docTypeName(it.docType, LocalContext.current) } ?: stringResource(R.string.document_title_fallback), onBack) {
+            IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Filled.Delete, stringResource(R.string.action_delete)) }
         }
     }) { padding ->
         if (doc == null) {
-            Text("Document not found", Modifier.padding(padding).padding(16.dp))
+            Text(stringResource(R.string.document_not_found), Modifier.padding(padding).padding(16.dp))
             return@Scaffold
         }
         val claims = remember(doc.id) { doc.claims() }
@@ -532,14 +560,16 @@ fun DocumentScreen(vm: MainViewModel, id: String, onShowQr: () -> Unit, onBack: 
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             DocumentCard(doc) {}
             OutlinedButton(onClick = onShowQr, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.QrCode, null); Text("  Show QR to a verifier in person")
+                Icon(Icons.Filled.QrCode, null)
+                Text(stringResource(R.string.action_show_qr_in_person), Modifier.padding(start = 8.dp))
             }
             val fmt = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm").withZone(ZoneId.systemDefault())
-            Text("Added ${fmt.format(doc.issuedAt)} · ${doc.docType}", style = MaterialTheme.typography.labelSmall)
+            Text(stringResource(R.string.document_added_on, fmt.format(doc.issuedAt), doc.docType), style = MaterialTheme.typography.labelSmall)
+            val namespaceLabels = namespaceLabelsMap()
             claims.forEach { (ns, elements) ->
                 Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
                     Column(Modifier.padding(16.dp)) {
-                        Text(NAMESPACE_LABELS[ns] ?: ns, style = MaterialTheme.typography.titleSmall,
+                        Text(namespaceLabels[ns] ?: ns, style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
                         elements.filterKeys { it !in IMAGE_CLAIMS }.forEach { (name, value) ->
                             HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
@@ -554,17 +584,18 @@ fun DocumentScreen(vm: MainViewModel, id: String, onShowQr: () -> Unit, onBack: 
             }
         }
         if (confirmDelete) {
+            val deleteReason = stringResource(R.string.auth_reason_delete_credential)
             AlertDialog(
                 onDismissRequest = { confirmDelete = false },
-                title = { Text("Delete this credential?") },
-                text = { Text("The credential and its device key are removed from this phone. You can get it again from the issuer.") },
+                title = { Text(stringResource(R.string.dialog_delete_credential_title)) },
+                text = { Text(stringResource(R.string.dialog_delete_credential_body)) },
                 confirmButton = {
                     TextButton(onClick = {
                         confirmDelete = false
-                        auth.request("Delete credential") { vm.repository.delete(doc.id); onBack() }
-                    }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                        auth.request(deleteReason) { vm.repository.delete(doc.id); onBack() }
+                    }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
                 },
-                dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
+                dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) } },
             )
         }
     }
@@ -583,47 +614,49 @@ private fun SettingsTab(vm: MainViewModel, onActivity: () -> Unit, onChangeSecur
     var authShare by remember { mutableStateOf(vm.lock.requireAuthToShare) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        SettingsGroup("Activity") {
-            SettingsRow(Icons.Filled.History, "Wallet activity history",
-                if (entries.isEmpty()) "No activity yet" else "${entries.size} event(s) · latest: ${entries.first().title}",
+        Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        SettingsGroup(stringResource(R.string.settings_group_activity)) {
+            SettingsRow(Icons.Filled.History, stringResource(R.string.settings_activity_row_title),
+                if (entries.isEmpty()) stringResource(R.string.settings_activity_none)
+                else stringResource(R.string.settings_activity_summary, entries.size, entries.first().title),
                 onClick = onActivity)
         }
-        SettingsGroup("Security") {
-            SettingsRow(Icons.Filled.Lock, "Unlock method", when (method) {
-                LockMethod.PIN -> "Wallet PIN"
-                LockMethod.BIOMETRIC -> "Biometrics / device screen lock"
-                LockMethod.NONE -> "Not set"
-            }, onClick = onChangeSecurity)
+        SettingsGroup(stringResource(R.string.settings_group_security)) {
+            SettingsRow(Icons.Filled.Lock, stringResource(R.string.settings_unlock_method), stringResource(when (method) {
+                LockMethod.PIN -> R.string.settings_unlock_pin
+                LockMethod.BIOMETRIC -> R.string.settings_unlock_biometric
+                LockMethod.NONE -> R.string.settings_unlock_none
+            }), onClick = onChangeSecurity)
+            LanguageRow()
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(start = 40.dp)) {
-                    Text("Confirm before sharing")
-                    Text("Ask for your PIN or biometrics each time data is shared", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_confirm_before_sharing))
+                    Text(stringResource(R.string.settings_confirm_before_sharing_body), style = MaterialTheme.typography.bodySmall)
                 }
                 Switch(authShare, { authShare = it; vm.lock.requireAuthToShare = it })
             }
         }
-        SettingsGroup("Issuer") {
-            SettingsRow(Icons.Filled.Cloud, "PID issuer backend", vm.settings.issuerUrl, onClick = { editUrl = true })
-            SettingsRow(Icons.AutoMirrored.Filled.OpenInNew, "Issuer portal (credential offers)", "${vm.settings.issuerUrl}/issuer",
+        SettingsGroup(stringResource(R.string.settings_group_issuer)) {
+            SettingsRow(Icons.Filled.Cloud, stringResource(R.string.settings_issuer_backend), vm.settings.issuerUrl, onClick = { editUrl = true })
+            SettingsRow(Icons.AutoMirrored.Filled.OpenInNew, stringResource(R.string.settings_issuer_portal_row), "${vm.settings.issuerUrl}/issuer",
                 onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(vm.settings.issuerUrl + "/issuer"))) })
-            SettingsRow(Icons.AutoMirrored.Filled.OpenInNew, "Issuer IACA certificate (for verifiers)", "${vm.settings.issuerUrl}/pki/iaca.pem",
+            SettingsRow(Icons.AutoMirrored.Filled.OpenInNew, stringResource(R.string.settings_issuer_iaca_row), "${vm.settings.issuerUrl}/pki/iaca.pem",
                 onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(vm.settings.issuerUrl + "/pki/iaca.pem"))) })
         }
-        SettingsGroup("About") {
-            SettingsRow(Icons.AutoMirrored.Filled.HelpOutline, "How it works", "Replay the tutorial", onClick = onHelp)
-            SettingsRow(Icons.Filled.Info, "getYourID Wallet ${BuildConfig.VERSION_NAME}",
-                "Wallet unit ${vm.lock.walletUnitId.take(8)} · test issuer, not for production use", onClick = null)
+        SettingsGroup(stringResource(R.string.settings_group_about)) {
+            SettingsRow(Icons.AutoMirrored.Filled.HelpOutline, stringResource(R.string.settings_how_it_works), stringResource(R.string.settings_replay_tutorial), onClick = onHelp)
+            SettingsRow(Icons.Filled.Info, stringResource(R.string.settings_about_wallet_version, stringResource(R.string.app_name), BuildConfig.VERSION_NAME),
+                stringResource(R.string.settings_about_wallet_detail, vm.lock.walletUnitId.take(8)), onClick = null)
         }
     }
     if (editUrl) {
         var url by remember { mutableStateOf(vm.settings.issuerUrl) }
         AlertDialog(
             onDismissRequest = { editUrl = false },
-            title = { Text("PID issuer backend") },
-            text = { OutlinedTextField(url, { url = it }, singleLine = true, label = { Text("URL") }) },
-            confirmButton = { TextButton(onClick = { vm.settings.issuerUrl = url; editUrl = false }) { Text("Save") } },
-            dismissButton = { TextButton(onClick = { editUrl = false }) { Text("Cancel") } },
+            title = { Text(stringResource(R.string.dialog_issuer_backend_title)) },
+            text = { OutlinedTextField(url, { url = it }, singleLine = true, label = { Text(stringResource(R.string.label_url)) }) },
+            confirmButton = { TextButton(onClick = { vm.settings.issuerUrl = url; editUrl = false }) { Text(stringResource(R.string.action_save)) } },
+            dismissButton = { TextButton(onClick = { editUrl = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }
@@ -650,4 +683,43 @@ private fun SettingsRow(icon: ImageVector, title: String, subtitle: String, onCl
         }
         if (onClick != null) Icon(Icons.Filled.ChevronRight, null)
     }
+}
+
+/** English / French (or "Match device") per-app language, applied immediately via AppCompatDelegate. */
+@Composable
+private fun LanguageRow() {
+    var showPicker by remember { mutableStateOf(false) }
+    var current by remember { mutableStateOf(currentAppLanguageTag()) }
+    SettingsRow(Icons.Filled.Language, stringResource(R.string.settings_language), languageLabel(current), onClick = { showPicker = true })
+    if (showPicker) {
+        AlertDialog(
+            onDismissRequest = { showPicker = false },
+            title = { Text(stringResource(R.string.settings_language)) },
+            text = {
+                Column {
+                    listOf(null, "en", "fr").forEach { tag ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                setAppLanguage(tag)
+                                current = tag
+                                showPicker = false
+                            }.padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = current == tag, onClick = null)
+                            Text(languageLabel(tag), Modifier.padding(start = 8.dp))
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showPicker = false }) { Text(stringResource(R.string.action_close)) } },
+        )
+    }
+}
+
+@Composable
+private fun languageLabel(tag: String?): String = when (tag) {
+    "en" -> stringResource(R.string.settings_language_english)
+    "fr" -> stringResource(R.string.settings_language_french)
+    else -> stringResource(R.string.settings_language_system)
 }

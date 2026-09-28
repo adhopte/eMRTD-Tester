@@ -4,6 +4,7 @@ import android.app.Application
 import android.nfc.Tag
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.adhopte.emrtdwallet.R
 import io.github.adhopte.emrtdwallet.WalletApp
 import io.github.adhopte.emrtdwallet.data.SelfieUpload
 import io.github.adhopte.emrtdwallet.emrtd.ChipReadResult
@@ -35,6 +36,7 @@ sealed interface IssuanceState {
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val walletApp = app as WalletApp
+    private val ctx get() = getApplication<Application>()
     val repository = walletApp.repository
     val settings = walletApp.settings
     val lock = walletApp.lock
@@ -67,7 +69,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun onPassportTag(tag: Tag) {
         val key = _accessKey.value ?: return
         if (_issuance.value is IssuanceState.Working) return
-        _issuance.value = IssuanceState.Working("Hold the document still against the phone…", 0f)
+        _issuance.value = IssuanceState.Working(ctx.getString(R.string.vm_working_hold_document), 0f)
         viewModelScope.launch {
             try {
                 val read = repository.passportReader.read(tag, key) { message, fraction ->
@@ -92,7 +94,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val selfie = capture?.let { SelfieUpload(it.selfie, it.turnLeft, it.turnRight, it.report.toJson()) }
         pendingChip?.let { read ->
             _issuance.value = IssuanceState.Working(
-                if (selfie != null) "Verifying chip, matching your selfie and issuing PID…" else "Verifying chip and issuing PID…")
+                if (selfie != null) ctx.getString(R.string.vm_working_verifying_chip_selfie)
+                else ctx.getString(R.string.vm_working_verifying_chip))
             viewModelScope.launch {
                 try {
                     val outcome = repository.issueFromChip(read, selfie)
@@ -108,7 +111,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun submitImages(front: ByteArray, back: ByteArray?, kind: String, uploaded: Boolean, selfie: SelfieUpload?) {
-        _issuance.value = IssuanceState.Working("Reading document text…")
+        _issuance.value = IssuanceState.Working(ctx.getString(R.string.vm_working_reading_document))
         viewModelScope.launch {
             try {
                 val (f, b) = withContext(Dispatchers.Default) {
@@ -123,8 +126,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 _issuance.value = IssuanceState.Working(
-                    if (selfie != null) "Validating document, matching your selfie and issuing PID…"
-                    else "Validating document and issuing PID…")
+                    if (selfie != null) ctx.getString(R.string.vm_working_validating_document_selfie)
+                    else ctx.getString(R.string.vm_working_validating_document))
                 _issuance.value = IssuanceState.Finished(repository.issueFromImages(f, b, ocr, kind, uploaded, selfie))
             } catch (e: Exception) {
                 _issuance.value = IssuanceState.Failed(friendly(e))
@@ -134,11 +137,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun friendly(e: Exception): String = when {
         e.javaClass.simpleName == "TagLostException" || e.message?.contains("Tag was lost") == true ->
-            "Connection to the chip was lost. Keep the document on the phone until reading completes."
+            ctx.getString(R.string.error_tag_lost)
         e is java.net.ConnectException || e is java.net.UnknownHostException ->
-            "Cannot reach the issuer at ${settings.issuerUrl}. Check Settings."
+            ctx.getString(R.string.error_cannot_reach_issuer, settings.issuerUrl)
         e.javaClass.simpleName.contains("CardServiceException") && e.message?.contains("BAC") == true ->
-            "Access denied by the chip: check document number, date of birth and expiry (or CAN)."
+            ctx.getString(R.string.error_chip_access_denied)
         else -> e.message ?: e.toString()
     }
 }

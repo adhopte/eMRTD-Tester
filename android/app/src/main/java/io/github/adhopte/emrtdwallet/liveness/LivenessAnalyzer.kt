@@ -20,13 +20,7 @@ class SelfieCapture(
     val report: Map<String, Any>,
 )
 
-enum class LivenessStep(val instruction: String) {
-    CENTER("Look straight at the camera"),
-    BLINK("Blink slowly"),
-    TURN("Turn your head slowly to one side"),
-    TURN_OTHER("Now turn your head to the other side"),
-    DONE("Done"),
-}
+enum class LivenessStep { CENTER, BLINK, TURN, TURN_OTHER, DONE }
 
 data class LivenessUi(
     val step: LivenessStep,

@@ -47,13 +47,24 @@ import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.github.adhopte.emrtdwallet.R
 import io.github.adhopte.emrtdwallet.liveness.LivenessAnalyzer
 import io.github.adhopte.emrtdwallet.liveness.LivenessStep
 import io.github.adhopte.emrtdwallet.liveness.LivenessUi
 import io.github.adhopte.emrtdwallet.liveness.SelfieCapture
+
+@Composable
+private fun LivenessStep.instructionText(): String = stringResource(when (this) {
+    LivenessStep.CENTER -> R.string.liveness_look_straight
+    LivenessStep.BLINK -> R.string.liveness_blink_slowly
+    LivenessStep.TURN -> R.string.liveness_turn_one_side
+    LivenessStep.TURN_OTHER -> R.string.liveness_turn_other_side
+    LivenessStep.DONE -> R.string.liveness_done
+})
 
 /**
  * Selfie with active liveness: the holder blinks and turns their head both ways, then looks at
@@ -79,7 +90,7 @@ fun SelfieScreen(vm: MainViewModel, onSubmitted: () -> Unit, onBack: () -> Unit)
     }
     DisposableEffect(analyzer) { onDispose { analyzer?.close() } }
 
-    Scaffold(topBar = { SimpleTopBar("Verify it's you", onBack) }) { padding ->
+    Scaffold(topBar = { SimpleTopBar(stringResource(R.string.selfie_verify_title), onBack) }) { padding ->
         Column(
             Modifier.padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -87,23 +98,21 @@ fun SelfieScreen(vm: MainViewModel, onSubmitted: () -> Unit, onBack: () -> Unit)
         ) {
             if (!started) {
                 Icon(Icons.Filled.Face, null, Modifier.size(96.dp), tint = MaterialTheme.colorScheme.primary)
-                Text("Take a live selfie", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.selfie_take_live_selfie), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Text(
-                    "The issuer compares your face with the portrait on your document (chip or photo) before " +
-                        "issuing your PID. You'll be asked to blink and turn your head — this shows it's really " +
-                        "you in front of the camera, not a photo.",
+                    stringResource(R.string.selfie_intro_body),
                     textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium,
                 )
                 Tips()
                 Button(onClick = { started = true }, enabled = cameraAllowed, modifier = Modifier.fillMaxWidth()) {
-                    Text("Start")
+                    Text(stringResource(R.string.action_start))
                 }
-                if (!cameraAllowed) Text("Camera permission is needed for the selfie.", color = MaterialTheme.colorScheme.error)
-                TextButton(onClick = { vm.submitWithSelfie(null) }) { Text("Skip (issuer may refuse, lower assurance)") }
+                if (!cameraAllowed) Text(stringResource(R.string.selfie_camera_permission_needed), color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = { vm.submitWithSelfie(null) }) { Text(stringResource(R.string.selfie_skip)) }
                 return@Column
             }
             val done = ui.step == LivenessStep.DONE
-            Text(if (done) "Great — sending to the issuer…" else ui.step.instruction,
+            Text(if (done) stringResource(R.string.selfie_sending) else ui.step.instructionText(),
                 style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
             LinearProgressIndicator(progress = { ui.completed / ui.total.toFloat() }, Modifier.fillMaxWidth())
             Box(Modifier.fillMaxWidth().aspectRatio(0.75f)) {
@@ -114,7 +123,7 @@ fun SelfieScreen(vm: MainViewModel, onSubmitted: () -> Unit, onBack: () -> Unit)
                 FaceOval(ui.faceOk, ui.step)
             }
             Text(ui.hint ?: " ", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
-            TextButton(onClick = { attempt++; ui = LivenessUi(LivenessStep.CENTER) }) { Text("Restart") }
+            TextButton(onClick = { attempt++; ui = LivenessUi(LivenessStep.CENTER) }) { Text(stringResource(R.string.action_restart)) }
         }
     }
 }
@@ -125,7 +134,7 @@ private fun Tips() {
         Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(16.dp)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        listOf("Good, even light on your face", "Remove sunglasses, hat or mask", "Hold the phone at eye level")
+        listOf(stringResource(R.string.selfie_tip_light), stringResource(R.string.selfie_tip_remove_accessories), stringResource(R.string.selfie_tip_eye_level))
             .forEach { Row { Text("•  "); Text(it, style = MaterialTheme.typography.bodyMedium) } }
     }
 }

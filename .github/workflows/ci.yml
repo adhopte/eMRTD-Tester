@@ -39,16 +39,29 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
-      # Default issuer URL baked into the APK; override with the repository variable ISSUER_URL
-      - run: ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease --no-daemon -PissuerUrl=${{ vars.ISSUER_URL || 'https://emrtd-pid-issuer.onrender.com' }}
+      # Default issuer URL baked into both flavors; override with the repository variables
+      # ISSUER_URL / ANIP_ISSUER_URL. ANIP_ISSUER_URL falls back to ISSUER_URL when unset,
+      # same as the -PanipIssuerUrl Gradle property does.
+      - run: >
+          ./gradlew
+          :app:testIngroupeDebugUnitTest :app:testAnipBeninDebugUnitTest
+          :app:assembleIngroupeDebug :app:assembleIngroupeRelease
+          :app:assembleAnipBeninDebug :app:assembleAnipBeninRelease
+          --no-daemon
+          -PissuerUrl=${{ vars.ISSUER_URL || 'https://emrtd-pid-issuer.onrender.com' }}
+          -PanipIssuerUrl=${{ vars.ANIP_ISSUER_URL || vars.ISSUER_URL || 'https://emrtd-pid-issuer.onrender.com' }}
       - run: |
-          cp app/build/outputs/apk/release/app-release.apk app/build/outputs/getyourid-wallet.apk
-          cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/getyourid-wallet-debug.apk
+          cp app/build/outputs/apk/ingroupe/release/app-ingroupe-release.apk app/build/outputs/getyourid-wallet.apk
+          cp app/build/outputs/apk/ingroupe/debug/app-ingroupe-debug.apk app/build/outputs/getyourid-wallet-debug.apk
+          cp app/build/outputs/apk/anipBenin/release/app-anipBenin-release.apk app/build/outputs/anip-benin-wallet.apk
+          cp app/build/outputs/apk/anipBenin/debug/app-anipBenin-debug.apk app/build/outputs/anip-benin-wallet-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: getyourid-wallet-apks
-          path: android/app/build/outputs/getyourid-wallet*.apk
-      # Publish the plain APK (not zipped) as a rolling pre-release for easy phone download
+          path: |
+            android/app/build/outputs/getyourid-wallet*.apk
+            android/app/build/outputs/anip-benin-wallet*.apk
+      # Publish the plain APKs (not zipped) as a rolling pre-release for easy phone download
       - name: Remove APKs with the old app name from the pre-release
         if: github.event_name == 'push'
         env:
@@ -57,7 +70,7 @@ jobs:
           for f in emrtd-pid-wallet.apk emrtd-pid-wallet-debug.apk; do
             gh release delete-asset dev-build "$f" -y --repo "${{ github.repository }}" || true
           done
-      - name: Publish APK to the "dev-build" pre-release
+      - name: Publish APKs to the "dev-build" pre-release
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
@@ -67,9 +80,11 @@ jobs:
           make_latest: false
           body: |
             Build of `${{ github.sha }}` from `${{ github.ref_name }}`.
-            Install **getyourid-wallet.apk** (release build, Android 8+). The -debug APK also allows plain-HTTP issuers on your LAN.
+            Install **getyourid-wallet.apk** (IN Groupe branding, release build, Android 8+) or **anip-benin-wallet.apk** (ANIP Bénin branding). The -debug APKs also allow plain-HTTP issuers on your LAN; both install alongside each other and alongside the release build.
             Default issuer: ${{ vars.ISSUER_URL || 'https://emrtd-pid-issuer.onrender.com' }} (changeable in Settings).
             Signed with the public development key in android/keystore — updates install over earlier dev builds.
           files: |
             android/app/build/outputs/getyourid-wallet.apk
             android/app/build/outputs/getyourid-wallet-debug.apk
+            android/app/build/outputs/anip-benin-wallet.apk
+            android/app/build/outputs/anip-benin-wallet-debug.apk

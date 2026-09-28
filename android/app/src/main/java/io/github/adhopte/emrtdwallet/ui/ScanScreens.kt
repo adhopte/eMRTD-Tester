@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -72,6 +73,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import io.github.adhopte.emrtdwallet.MainActivity
+import io.github.adhopte.emrtdwallet.R
 import io.github.adhopte.emrtdwallet.wallet.OfferController
 import io.github.adhopte.emrtdwallet.wallet.OfferState
 
@@ -148,13 +150,13 @@ fun ScanQrScreen(onTarget: (ScanTarget) -> Unit, onBack: () -> Unit) {
                 addRoundRect(androidx.compose.ui.geometry.RoundRect(tl.x, tl.y, tl.x + side, tl.y + side, CornerRadius(28.dp.toPx())))
             }
             clipPath(window, clipOp = ClipOp.Difference) { drawRect(Color.Black.copy(alpha = 0.6f)) }
-            drawRoundRect(InGroupe.SkyBlue, tl, Size(side, side), CornerRadius(28.dp.toPx()), style = Stroke(4.dp.toPx()))
+            drawRoundRect(Brand.SkyBlue, tl, Size(side, side), CornerRadius(28.dp.toPx()), style = Stroke(4.dp.toPx()))
             val y = tl.y + 16.dp.toPx() + (side - 32.dp.toPx()) * sweep
-            drawLine(InGroupe.Red, Offset(tl.x + 20.dp.toPx(), y), Offset(tl.x + side - 20.dp.toPx(), y), 3.dp.toPx())
+            drawLine(Brand.Red, Offset(tl.x + 20.dp.toPx(), y), Offset(tl.x + side - 20.dp.toPx(), y), 3.dp.toPx())
         }
         Row(Modifier.statusBarsPadding().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White) }
-            Text("Scan QR code", color = Color.White, style = MaterialTheme.typography.titleLarge)
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back), tint = Color.White) }
+            Text(stringResource(R.string.scan_title), color = Color.White, style = MaterialTheme.typography.titleLarge)
         }
         Column(
             Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(20.dp),
@@ -162,18 +164,16 @@ fun ScanQrScreen(onTarget: (ScanTarget) -> Unit, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                if (cameraAllowed) "Point at a QR code shown by a website or a verifier to share your data, " +
-                    "or by an issuer to add a credential."
-                else "Camera permission is needed to scan. You can paste a link instead.",
+                stringResource(if (cameraAllowed) R.string.scan_hint_camera_allowed else R.string.scan_hint_camera_denied),
                 color = Color.White, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ScanHint("Share with a website")
-                ScanHint("Get a credential")
+                ScanHint(stringResource(R.string.scan_hint_share_website))
+                ScanHint(stringResource(R.string.scan_hint_get_credential))
             }
             OutlinedButton(onClick = { paste = true }) {
                 Icon(Icons.Filled.ContentPaste, null, tint = Color.White)
-                Text("  Paste a link", color = Color.White)
+                Text(stringResource(R.string.scan_paste_link), Modifier.padding(start = 8.dp), color = Color.White)
             }
         }
     }
@@ -187,9 +187,9 @@ fun ScanQrScreen(onTarget: (ScanTarget) -> Unit, onBack: () -> Unit) {
     unsupported?.let { text ->
         AlertDialog(
             onDismissRequest = { unsupported = null; analyzer.rearm() },
-            title = { Text("Not a wallet QR code") },
-            text = { Text("This code is not a presentation request or a credential offer:\n\n${text.take(160)}") },
-            confirmButton = { TextButton(onClick = { unsupported = null; analyzer.rearm() }) { Text("Scan again") } },
+            title = { Text(stringResource(R.string.scan_not_wallet_qr_title)) },
+            text = { Text(stringResource(R.string.scan_not_wallet_qr_body, text.take(160))) },
+            confirmButton = { TextButton(onClick = { unsupported = null; analyzer.rearm() }) { Text(stringResource(R.string.scan_again)) } },
         )
     }
 }
@@ -206,13 +206,13 @@ private fun PasteLinkDialog(onDismiss: () -> Unit, onOk: (String) -> Unit) {
     var text by remember { mutableStateOf(clipboard.getText()?.text.orEmpty()) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Paste a link") },
+        title = { Text(stringResource(R.string.scan_paste_link_title)) },
         text = {
-            OutlinedTextField(text, { text = it }, label = { Text("openid4vp://… or openid-credential-offer://…") },
+            OutlinedTextField(text, { text = it }, label = { Text(stringResource(R.string.scan_paste_link_placeholder)) },
                 modifier = Modifier.fillMaxWidth())
         },
-        confirmButton = { TextButton(onClick = { onOk(text) }, enabled = text.isNotBlank()) { Text("Open") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = { onOk(text) }, enabled = text.isNotBlank()) { Text(stringResource(R.string.scan_open)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
@@ -221,7 +221,7 @@ private fun PasteLinkDialog(onDismiss: () -> Unit, onOk: (String) -> Unit) {
 fun OfferScreen(vm: MainViewModel, onClose: () -> Unit, onOpenWallet: () -> Unit) {
     val state by vm.offers.state.collectAsState()
     var code by remember { mutableStateOf("") }
-    Scaffold(topBar = { SimpleTopBar("Add to wallet", { vm.offers.decline(); onClose() }) }) { padding ->
+    Scaffold(topBar = { SimpleTopBar(stringResource(R.string.offer_add_to_wallet_title), { vm.offers.decline(); onClose() }) }) { padding ->
         Column(
             Modifier.padding(padding).padding(20.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -229,28 +229,29 @@ fun OfferScreen(vm: MainViewModel, onClose: () -> Unit, onOpenWallet: () -> Unit
         ) {
             when (val s = state) {
                 OfferState.Idle, OfferState.Resolving -> {
-                    Spacer(Modifier.height(48.dp)); CircularProgressIndicator(); Text("Reading the offer…")
+                    Spacer(Modifier.height(48.dp)); CircularProgressIndicator(); Text(stringResource(R.string.offer_reading))
                 }
                 is OfferState.Ready -> {
                     IssuerHeader(s.issuer)
-                    Text("offers to add to your wallet:", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.offer_offers_to_add), style = MaterialTheme.typography.bodyMedium)
                     s.items.forEach { item -> OfferedCredentialCard(item.name, item.docType) }
                     s.txCode?.let { tx ->
                         OutlinedTextField(
                             value = code, onValueChange = { v -> code = if (tx.numeric) v.filter(Char::isDigit) else v },
-                            label = { Text(tx.description ?: "Transaction code") },
-                            supportingText = { Text("The issuer gave you this code separately${tx.length?.let { " ($it characters)" } ?: ""}") },
+                            label = { Text(tx.description ?: stringResource(R.string.offer_transaction_code)) },
+                            supportingText = { Text(stringResource(R.string.offer_tx_code_hint,
+                                tx.length?.let { stringResource(R.string.offer_tx_code_length, it) } ?: "")) },
                             keyboardOptions = KeyboardOptions(keyboardType = if (tx.numeric) KeyboardType.NumberPassword else KeyboardType.Password),
                             singleLine = true, modifier = Modifier.fillMaxWidth(),
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(onClick = { vm.offers.decline(); onClose() }, modifier = Modifier.weight(1f)) { Text("Decline") }
+                        OutlinedButton(onClick = { vm.offers.decline(); onClose() }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.action_decline)) }
                         Button(
                             onClick = { vm.offers.accept(code.ifBlank { null }) },
                             enabled = s.txCode == null || code.length >= (s.txCode.length ?: 1),
                             modifier = Modifier.weight(1f),
-                        ) { Text("Add") }
+                        ) { Text(stringResource(R.string.action_add)) }
                     }
                 }
                 is OfferState.Issuing -> {
@@ -260,17 +261,17 @@ fun OfferScreen(vm: MainViewModel, onClose: () -> Unit, onOpenWallet: () -> Unit
                     val ok = s.issued.isNotEmpty()
                     Icon(if (ok) Icons.Filled.CheckCircle else Icons.Filled.Error, null, Modifier.size(72.dp),
                         tint = if (ok) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error)
-                    Text(if (ok) "Added to your wallet" else "Nothing was added", style = MaterialTheme.typography.headlineSmall)
+                    Text(stringResource(if (ok) R.string.offer_added_to_wallet else R.string.offer_nothing_added), style = MaterialTheme.typography.headlineSmall)
                     s.issued.forEach { Text("✓ $it") }
-                    s.deferred.forEach { Text("⏳ $it (the issuer will deliver it later)") }
+                    s.deferred.forEach { Text(stringResource(R.string.offer_deferred_item, it)) }
                     s.failed.forEach { Text("✗ $it", color = MaterialTheme.colorScheme.error) }
-                    Button(onClick = { vm.offers.reset(); onOpenWallet() }, modifier = Modifier.fillMaxWidth()) { Text("Go to wallet") }
+                    Button(onClick = { vm.offers.reset(); onOpenWallet() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.offer_go_to_wallet)) }
                 }
                 is OfferState.Failed -> {
                     Icon(Icons.Filled.Error, null, Modifier.size(72.dp), tint = MaterialTheme.colorScheme.error)
-                    Text("Could not add the credential", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.offer_could_not_add), style = MaterialTheme.typography.titleLarge)
                     Text(s.message, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
-                    Button(onClick = { vm.offers.reset(); onClose() }, modifier = Modifier.fillMaxWidth()) { Text("Close") }
+                    Button(onClick = { vm.offers.reset(); onClose() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.action_close)) }
                 }
             }
         }

@@ -1,9 +1,10 @@
 <resources>
-    <!-- Window theme shown before Compose draws (launch); colours from the IN Groupe palette -->
+    <!-- Window theme shown before Compose draws (launch); colours come from the active product
+         flavor's res/values/colors.xml (app/src/ingroupe or app/src/anipBenin). -->
     <style name="Theme.GetYourIdWallet" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:colorPrimary">#002F87</item>
-        <item name="android:colorAccent">#43B2ED</item>
-        <item name="android:windowBackground">@color/ingroupe_surface</item>
+        <item name="android:colorPrimary">@color/brand_primary</item>
+        <item name="android:colorAccent">@color/brand_accent</item>
+        <item name="android:windowBackground">@color/brand_surface</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>

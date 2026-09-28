@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">getYourID Wallet</string>
+    <string name="nfc_engagement_service_desc">getYourID Wallet: share your PID with a proximity reader (ISO 18013-5)</string>
+    <string name="brand_tagline">by IN Groupe</string>
+    <string name="brand_short_name">IN Groupe</string>
+    <string name="issuer_display_name">IN Groupe Issuer</string>
+    <string name="issuer_portal_menu_title">Open the IN Groupe issuer portal</string>
+    <string name="tutorial_welcome_body">Turn your passport or ID card into a digital European identity (PID), issued by IN Groupe and kept securely on this phone.</string>
+    <string name="tutorial_nfc_body">Place the phone flat on the passport (or the ID card) and keep still. The chip is read over NFC and checked by IN Groupe — Passive, Active and Chip Authentication.</string>
+    <string name="tutorial_selfie_body">Blink and turn your head when asked, then look at the camera. IN Groupe compares your face with the photo from the chip or the document before issuing your PID.</string>
+</resources>

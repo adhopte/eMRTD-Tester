@@ -52,9 +52,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.github.adhopte.emrtdwallet.R
 import io.github.adhopte.emrtdwallet.wallet.ConsentRequest
 import io.github.adhopte.emrtdwallet.wallet.PresentationState
 
@@ -86,11 +88,12 @@ fun PresentScreen(vm: MainViewModel, onClose: () -> Unit) {
     val state by presentation.state.collectAsState()
     val context = LocalContext.current
     val auth = rememberAuthenticator(vm.lock)
-    val title = when (state) {
-        is PresentationState.QrReady -> "Share in person"
-        is PresentationState.AwaitingConsent -> "Review request"
-        else -> "Share"
-    }
+    val shareReason = stringResource(R.string.auth_reason_share_data)
+    val title = stringResource(when (state) {
+        is PresentationState.QrReady -> R.string.present_title_in_person
+        is PresentationState.AwaitingConsent -> R.string.present_title_review
+        else -> R.string.present_title_share
+    })
     Scaffold(topBar = { SimpleTopBar(title, onClose) }) { padding ->
         Column(
             Modifier.padding(padding).padding(20.dp).verticalScroll(rememberScrollState()),
@@ -98,47 +101,47 @@ fun PresentScreen(vm: MainViewModel, onClose: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             when (val s = state) {
-                PresentationState.Idle, PresentationState.Connecting -> Waiting("Connecting to the verifier…")
+                PresentationState.Idle, PresentationState.Connecting -> Waiting(stringResource(R.string.present_connecting))
                 is PresentationState.QrReady -> {
-                    Text("Let the verifier scan this code", style = MaterialTheme.typography.titleLarge,
+                    Text(stringResource(R.string.present_let_verifier_scan), style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
                     Card(shape = RoundedCornerShape(24.dp), elevation = CardDefaults.cardElevation(6.dp),
                         colors = CardDefaults.cardColors(containerColor = Color.White)) {
-                        Image(s.qr.asImageBitmap(), "Device engagement QR code", Modifier.padding(16.dp).size(280.dp))
+                        Image(s.qr.asImageBitmap(), stringResource(R.string.present_qr_content_desc), Modifier.padding(16.dp).size(280.dp))
                     }
-                    Text("Nothing is shared yet: you will see who is asking and what, and decide.",
+                    Text(stringResource(R.string.present_nothing_shared_yet),
                         textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Hint(Icons.Filled.Bluetooth, "Keep Bluetooth on")
-                        if (rememberNfcStatus() == NfcStatus.ENABLED) Hint(Icons.Filled.Nfc, "Or tap an NFC reader")
+                        Hint(Icons.Filled.Bluetooth, stringResource(R.string.present_keep_bluetooth_on))
+                        if (rememberNfcStatus() == NfcStatus.ENABLED) Hint(Icons.Filled.Nfc, stringResource(R.string.present_or_tap_nfc))
                     }
                 }
-                PresentationState.Connected -> Waiting("Connected — waiting for the verifier's request…")
+                PresentationState.Connected -> Waiting(stringResource(R.string.present_connected_waiting))
                 is PresentationState.AwaitingConsent -> Consent(
                     s.request,
-                    onAccept = { option -> auth.request("Share your data") { presentation.accept(option) } },
+                    onAccept = { option -> auth.request(shareReason) { presentation.accept(option) } },
                     onReject = { presentation.reject(); onClose() },
                 )
-                PresentationState.Sending -> Waiting("Sending your data securely…")
+                PresentationState.Sending -> Waiting(stringResource(R.string.present_sending))
                 is PresentationState.Done -> {
                     Spacer(Modifier.height(24.dp))
                     Icon(Icons.Filled.CheckCircle, null, Modifier.size(88.dp), tint = Color(0xFF2E7D32))
-                    Text("Shared successfully", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    s.verifier?.let { Text("with $it", style = MaterialTheme.typography.titleMedium) }
-                    if (s.shared.isNotEmpty()) Text("${s.shared.size} attribute(s): ${s.shared.joinToString()}",
+                    Text(stringResource(R.string.present_shared_successfully), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    s.verifier?.let { Text(stringResource(R.string.present_with_verifier, it), style = MaterialTheme.typography.titleMedium) }
+                    if (s.shared.isNotEmpty()) Text(stringResource(R.string.present_shared_summary, s.shared.size, s.shared.joinToString()),
                         textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall)
                     s.redirectUri?.let { uri ->
                         Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri))) },
-                            modifier = Modifier.fillMaxWidth()) { Text("Continue on the website") }
+                            modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.present_continue_on_website)) }
                     }
-                    OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+                    OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.present_done)) }
                 }
                 is PresentationState.Failed -> {
                     Spacer(Modifier.height(24.dp))
                     Icon(Icons.Filled.Error, null, Modifier.size(80.dp), tint = MaterialTheme.colorScheme.error)
-                    Text("Sharing failed", style = MaterialTheme.typography.headlineSmall)
+                    Text(stringResource(R.string.present_sharing_failed), style = MaterialTheme.typography.headlineSmall)
                     Text(s.message, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
-                    OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Close") }
+                    OutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.action_close)) }
                 }
             }
         }
@@ -156,7 +159,7 @@ private fun Waiting(text: String) {
 private fun Hint(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-        Text(" $text", style = MaterialTheme.typography.labelMedium)
+        Text(text, Modifier.padding(start = 4.dp), style = MaterialTheme.typography.labelMedium)
     }
 }
 
@@ -174,25 +177,26 @@ private fun Consent(request: ConsentRequest, onAccept: (Int) -> Unit, onReject: 
                 }
                 Column(Modifier.padding(start = 14.dp)) {
                     Text(request.verifier, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(if (request.verifierTrusted) "Registered relying party" else "Identity not confirmed by a trusted list",
+                    Text(stringResource(if (request.verifierTrusted) R.string.present_registered_rp else R.string.present_identity_not_confirmed),
                         style = MaterialTheme.typography.bodySmall,
                         color = if (request.verifierTrusted) Color(0xFF2E7D32) else Color(0xFFB77900))
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
                         Icon(Icons.Filled.Language, null, Modifier.size(14.dp))
-                        Text(" ${request.transport}", style = MaterialTheme.typography.labelSmall)
+                        Text(request.transport, Modifier.padding(start = 4.dp), style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
         }
-        Text("wants to see", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.present_wants_to_see), style = MaterialTheme.typography.titleSmall)
         if (request.options.size > 1) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 request.options.indices.forEach { i ->
-                    FilterChip(option == i, { option = i }, label = { Text("Option ${i + 1}") })
+                    FilterChip(option == i, { option = i }, label = { Text(stringResource(R.string.present_option_n, i + 1)) })
                 }
             }
         }
-        request.options[option].groupBy { it.document.ifBlank { "Your credential" } }.forEach { (doc, items) ->
+        val defaultCredentialLabel = stringResource(R.string.present_your_credential)
+        request.options[option].groupBy { it.document.ifBlank { defaultCredentialLabel } }.forEach { (doc, items) ->
             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
                 Column(Modifier.padding(16.dp)) {
                     Text(doc, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
@@ -200,23 +204,23 @@ private fun Consent(request: ConsentRequest, onAccept: (Int) -> Unit, onReject: 
                         if (i > 0) HorizontalDivider(Modifier.padding(vertical = 6.dp), color = MaterialTheme.colorScheme.surfaceVariant)
                         else Spacer(Modifier.height(8.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.CheckCircle, null, Modifier.size(18.dp), tint = InGroupe.SkyBlue)
+                            Icon(Icons.Filled.CheckCircle, null, Modifier.size(18.dp), tint = Brand.SkyBlue)
                             Text(claimLabel(item.element).takeIf { it != item.element } ?: item.displayName,
                                 Modifier.padding(start = 10.dp).weight(1f))
                             if (item.intentToRetain) Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Filled.Storage, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
-                                Text(" stored", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                                Text(stringResource(R.string.present_will_be_stored), Modifier.padding(start = 4.dp),
+                                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                             }
                         }
                     }
                 }
             }
         }
-        Text("Only the attributes above are shared, signed by your wallet. Check the verifier before you share.",
-            style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(R.string.present_only_attributes_shared), style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onReject, modifier = Modifier.weight(1f)) { Text("Decline") }
-            Button(onClick = { onAccept(option) }, modifier = Modifier.weight(1f)) { Text("Share") }
+            OutlinedButton(onClick = onReject, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.action_decline)) }
+            Button(onClick = { onAccept(option) }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.action_share)) }
         }
     }
 }

@@ -24,6 +24,27 @@ android {
         // 64-bit and 32-bit ARM phones; x86_64 keeps the emulator working.
         // (Only the optional ZK-proof library lacks a 32-bit build; this app does not use ZK presentation.)
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
+        // English (default) + French; per-app language switching (Settings) works down to API 26
+        // via AppCompatDelegate even though localeConfig itself is only used from API 33.
+        resourceConfigurations += listOf("en", "fr")
+    }
+
+    // Two brand skins of the same app, built from the same source tree via flavor-specific
+    // resources (res/, plus a Brand.kt object) under app/src/ingroupe and app/src/anipBenin.
+    flavorDimensions += "brand"
+    productFlavors {
+        create("ingroupe") {
+            dimension = "brand"
+            // Unchanged application id: this is the flavor every existing install upgrades from.
+        }
+        create("anipBenin") {
+            dimension = "brand"
+            applicationIdSuffix = ".anip"
+            // Same backend by default; override with -PanipIssuerUrl=... if ANIP gets its own instance.
+            val anipIssuerUrl = (project.findProperty("anipIssuerUrl") as String?)
+                ?: (project.findProperty("issuerUrl") as String?) ?: "http://10.0.2.2:8000"
+            buildConfigField("String", "DEFAULT_ISSUER_URL", "\"$anipIssuerUrl\"")
+        }
     }
 
     // A fixed, intentionally PUBLIC development key: every build (local or CI) gets the same
@@ -96,6 +117,8 @@ kotlin {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
+    // Per-app language switching (AppCompatDelegate.setApplicationLocales), also on API < 33
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)

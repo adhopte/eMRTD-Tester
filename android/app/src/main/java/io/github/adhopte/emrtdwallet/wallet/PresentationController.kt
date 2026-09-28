@@ -7,6 +7,7 @@ import android.util.Log
 import eu.europa.ec.eudi.iso18013.transfer.TransferEvent
 import eu.europa.ec.eudi.iso18013.transfer.response.RequestProcessor
 import eu.europa.ec.eudi.wallet.EudiWallet
+import io.github.adhopte.emrtdwallet.R
 import io.github.adhopte.emrtdwallet.data.ActivityLog
 import io.github.adhopte.emrtdwallet.data.ActivityType
 import kotlinx.coroutines.CoroutineScope
@@ -57,6 +58,7 @@ class PresentationController(
     private val activity: ActivityLog,
 ) : TransferEvent.Listener {
 
+    private val ctx = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val _state = MutableStateFlow<PresentationState>(PresentationState.Idle)
     val state: StateFlow<PresentationState> = _state.asStateFlow()
@@ -73,14 +75,14 @@ class PresentationController(
 
     fun startProximity() {
         clearSession()
-        transport = "In person (ISO/IEC 18013-5)"
+        transport = ctx.getString(R.string.transport_in_person)
         _state.value = PresentationState.Connecting
         wallet.startProximityPresentation()
     }
 
     fun startRemote(uri: Uri) {
         clearSession()
-        transport = REMOTE
+        transport = remoteTransportName()
         _state.value = PresentationState.Connecting
         wallet.startRemotePresentation(uri)
     }
@@ -104,14 +106,14 @@ class PresentationController(
                 val s = _state.value
                 if (s !is PresentationState.Done && s !is PresentationState.Failed && s !is PresentationState.Idle) {
                     _state.value = if (sent) PresentationState.Done(null, verifierName, sharedItems)
-                    else PresentationState.Failed("The verifier disconnected before a request was completed")
+                    else PresentationState.Failed(ctx.getString(R.string.presentation_verifier_disconnected))
                 }
                 stopTransports()
             }
             is TransferEvent.Error -> {
                 Log.w(TAG, "transfer error", event.error)
                 val msg = event.error.message ?: event.error.toString()
-                activity.add(ActivityType.PRESENTATION_FAILED, "Sharing failed", msg, verifierName)
+                activity.add(ActivityType.PRESENTATION_FAILED, ctx.getString(R.string.activity_sharing_failed), msg, verifierName)
                 _state.value = PresentationState.Failed(msg)
                 stopTransports()
             }
@@ -122,13 +124,13 @@ class PresentationController(
     private fun onRequest(event: TransferEvent.RequestReceived) {
         val processed = event.processedRequest
         if (processed is RequestProcessor.ProcessedRequest.Failure) {
-            _state.value = PresentationState.Failed("Invalid request: ${processed.error.message}")
+            _state.value = PresentationState.Failed(ctx.getString(R.string.presentation_invalid_request, processed.error.message ?: ""))
             return
         }
         val success = processed.getOrThrow()
         val selections = success.presentmentSelections
         if (selections.isEmpty() || selections.all { it.matches.isEmpty() }) {
-            _state.value = PresentationState.Failed("The verifier asked for a credential this wallet does not hold")
+            _state.value = PresentationState.Failed(ctx.getString(R.string.presentation_credential_not_held))
             return
         }
         pending = success
@@ -137,7 +139,7 @@ class PresentationController(
             ?: requester.origin
             ?: requester.appId
             ?: requester.certChain?.certificates?.firstOrNull()?.subject?.name
-            ?: "Unknown verifier"
+            ?: ctx.getString(R.string.presentation_unknown_verifier)
         verifierName = verifier
         _state.value = PresentationState.AwaitingConsent(
             ConsentRequest(
@@ -190,9 +192,9 @@ class PresentationController(
     fun reject() {
         val request = (_state.value as? PresentationState.AwaitingConsent)?.request
         pending = null
-        activity.add(ActivityType.PRESENTATION_DECLINED, "Declined a request", transport, verifierName,
+        activity.add(ActivityType.PRESENTATION_DECLINED, ctx.getString(R.string.activity_declined_request), transport, verifierName,
             request?.options?.firstOrNull()?.map { it.displayName }.orEmpty())
-        if (transport == REMOTE) runCatching { wallet.rejectRemotePresentation() } else stopTransports()
+        if (transport == remoteTransportName()) runCatching { wallet.rejectRemotePresentation() } else stopTransports()
         _state.value = PresentationState.Idle
     }
 
@@ -201,8 +203,10 @@ class PresentationController(
     private fun logShared() {
         if (logged) return
         logged = true
-        activity.add(ActivityType.PRESENTED, "Shared ${sharedItems.size} attribute(s)", transport, verifierName, sharedItems)
+        activity.add(ActivityType.PRESENTED, ctx.getString(R.string.activity_shared_attributes, sharedItems.size), transport, verifierName, sharedItems)
     }
+
+    private fun remoteTransportName() = ctx.getString(R.string.transport_online)
 
     private fun clearSession() {
         verifierName = null
@@ -225,6 +229,5 @@ class PresentationController(
 
     private companion object {
         const val TAG = "Presentation"
-        const val REMOTE = "Online (OpenID4VP)"
     }
 }

@@ -1,4 +1,420 @@
 <resources>
-    <string name="app_name">getYourID Wallet</string>
-    <string name="nfc_engagement_service_desc">getYourID Wallet: share your PID with a proximity reader (ISO 18013-5)</string>
+    <!-- Common actions -->
+    <string name="action_skip">Skip</string>
+    <string name="action_next">Next</string>
+    <string name="action_get_started">Get started</string>
+    <string name="action_back">Back</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_close">Close</string>
+    <string name="action_share">Share</string>
+    <string name="action_decline">Decline</string>
+    <string name="action_add">Add</string>
+    <string name="action_details">Details</string>
+    <string name="action_hide">Hide</string>
+    <string name="action_try_again">Try again</string>
+    <string name="action_restart">Restart</string>
+    <string name="action_start">Start</string>
+    <string name="action_add_pid">Add PID</string>
+    <string name="action_later">Later</string>
+    <string name="action_show_qr_in_person">Show QR to a verifier in person</string>
+
+    <!-- Tutorial -->
+    <string name="tutorial_page1_title">Welcome to %1$s</string>
+    <string name="tutorial_page2_title">1 · Scan the MRZ</string>
+    <string name="tutorial_page2_body">Chip documents: point the camera at the two or three lines of &lt;&lt;&lt; characters at the bottom of the passport photo page or on the back of the ID card. They are read automatically.</string>
+    <string name="tutorial_page3_title">2 · Hold the chip to your phone</string>
+    <string name="tutorial_page4_title">3 · Take a live selfie</string>
+    <string name="tutorial_page5_title">No chip or no NFC? Auto scan</string>
+    <string name="tutorial_page5_body">Choose \"Scan document\". Hold the ID card front, then the back, inside the frame — each side is captured automatically when it is sharp and steady. You can also upload a photo or PDF.</string>
+    <string name="tutorial_page6_title">Scan · Share · Add</string>
+    <string name="tutorial_page6_body">Tap Scan to read a website\'s QR code and share your data, or an issuer\'s QR code to add a credential such as a photo ID or proof of age. Show QR shares in person. You see who is asking and confirm with your PIN or fingerprint.</string>
+    <string name="illus_chip_verified">Chip verified</string>
+    <string name="illus_reading_chip">Reading chip…</string>
+    <string name="illus_hold_still">Hold still…</string>
+    <string name="illus_front_captured">Front captured</string>
+    <string name="illus_back_captured">Back captured</string>
+    <string name="illus_now_the_back">Now the back</string>
+    <string name="illus_looking_for_card">Looking for the card…</string>
+    <string name="illus_verifier_label">Verifier</string>
+    <string name="illus_over18_check">Over 18 ✓</string>
+    <string name="illus_waiting">Waiting…</string>
+    <string name="illus_turn_left">Turn left</string>
+    <string name="illus_turn_right">Turn right</string>
+    <string name="illus_passport_label">PASSPORT</string>
+    <string name="illus_identity_card_label">IDENTITY CARD</string>
+
+    <!-- Wallet / home -->
+    <string name="wallet_empty_title">Your wallet is empty</string>
+    <string name="wallet_empty_body">Get your Person Identification Data (PID) from your passport or ID card — with the chip for the highest assurance — then share it with websites and verifiers.</string>
+
+    <!-- Verification report sections -->
+    <string name="section_document_data">Document data</string>
+    <string name="section_passive_authentication">Passive Authentication</string>
+    <string name="section_active_authentication">Active Authentication</string>
+    <string name="section_chip_authentication">Chip Authentication</string>
+    <string name="section_image_quality">Image quality</string>
+    <string name="section_authenticity_checks">Authenticity checks</string>
+    <string name="section_mrz_viz_content">MRZ / VIZ content</string>
+    <string name="section_biometrics">Selfie: face match &amp; liveness</string>
+
+    <!-- Home / wallet tab -->
+    <string name="home_greeting_hello">Hello, %1$s</string>
+    <string name="home_greeting_welcome">Welcome</string>
+    <string name="home_subtitle_empty">Let\'s add your first credential</string>
+    <string name="home_subtitle_count">%1$d credential(s) in your wallet</string>
+    <string name="quick_scan_title">Scan QR</string>
+    <string name="quick_scan_subtitle">Share online · Get credentials</string>
+    <string name="quick_show_qr_title">Show QR</string>
+    <string name="quick_show_qr_subtitle">Share in person</string>
+    <string name="add_document_title">Add a document</string>
+    <string name="add_document_subtitle">Passport / ID card, or a credential offer from an issuer</string>
+    <string name="dialog_nothing_to_share_title">Nothing to share yet</string>
+    <string name="dialog_nothing_to_share_body">Add your PID first, then show the QR code to a verifier in person.</string>
+    <string name="nav_wallet">Wallet</string>
+    <string name="nav_scan">Scan</string>
+    <string name="nav_show_qr">Show QR</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Credential card -->
+    <string name="doc_over_label">Over %1$d</string>
+    <string name="doc_age_verified">Age verified</string>
+    <string name="doc_no_name_photo">No name or photo is shared</string>
+    <string name="doc_born">Born %1$s</string>
+    <string name="doc_valid_until">Valid until %1$s</string>
+    <string name="content_desc_portrait">Portrait</string>
+    <string name="issuer_source_chip"> · from chip</string>
+    <string name="issuer_source_scan"> · from document scan</string>
+    <string name="issuer_source_test"> · test data</string>
+    <string name="issuer_label_default">Issuer</string>
+    <string name="badge_pid">PID</string>
+    <string name="badge_photo_id">PHOTO ID</string>
+    <string name="badge_age_18">AGE 18+</string>
+    <string name="badge_mdl">mDL</string>
+    <string name="badge_attestation">ATTESTATION</string>
+    <string name="badge_pid_full_name">Personal ID (PID)</string>
+
+    <!-- Add-a-document screen -->
+    <string name="section_get_your_pid">Get your PID</string>
+    <string name="option_chip_title">Passport / ID card with chip</string>
+    <string name="option_chip_badge">Highest assurance</string>
+    <string name="option_chip_body_unavailable">Not available: this phone has no NFC reader.</string>
+    <string name="option_chip_body_disabled">Scan the MRZ, read the chip, take a selfie. NFC is off — tap to turn it on.</string>
+    <string name="option_chip_body_enabled">Scan the MRZ, hold the document to the phone, then take a live selfie. The issuer checks Passive, Active and Chip Authentication and matches your face with the chip photo.</string>
+    <string name="option_scan_title">Scan document images</string>
+    <string name="option_scan_badge">No chip needed</string>
+    <string name="option_scan_body">Photograph or upload the data page (and the back of ID cards), then take a live selfie. The issuer checks the images, the MRZ and your face.</string>
+    <string name="section_other_credentials">Other credentials</string>
+    <string name="option_offer_title">Scan an issuer\'s QR code</string>
+    <string name="option_offer_body">Add a PID or attestation (photo ID, age verification…) offered by an issuer through OpenID4VCI. You may need the transaction code the issuer gives you.</string>
+    <string name="option_portal_body">Create a credential offer QR code in a browser (on a computer, then scan it here).</string>
+
+    <!-- Document details -->
+    <string name="document_title_fallback">Document</string>
+    <string name="document_not_found">Document not found</string>
+    <string name="document_added_on">Added %1$s · %2$s</string>
+    <string name="dialog_delete_credential_title">Delete this credential?</string>
+    <string name="dialog_delete_credential_body">The credential and its device key are removed from this phone. You can get it again from the issuer.</string>
+    <string name="auth_reason_delete_credential">Delete credential</string>
+    <string name="auth_reason_change_security">Change unlock method</string>
+    <string name="auth_reason_share_data">Share your data</string>
+
+    <!-- Claim labels (document detail screen) -->
+    <string name="claim_family_name">Family name</string>
+    <string name="claim_given_names">Given names</string>
+    <string name="claim_birth_date">Date of birth</string>
+    <string name="claim_place_of_birth">Place of birth</string>
+    <string name="claim_nationality">Nationality</string>
+    <string name="claim_sex">Sex</string>
+    <string name="claim_address">Address</string>
+    <string name="claim_personal_number">Personal number</string>
+    <string name="claim_over_18">Over 18</string>
+    <string name="claim_over_21">Over 21</string>
+    <string name="claim_over_n">Over %1$s</string>
+    <string name="claim_age">Age</string>
+    <string name="claim_year_of_birth">Year of birth</string>
+    <string name="claim_issued_by">Issued by</string>
+    <string name="claim_issuing_country">Issuing country</string>
+    <string name="claim_document_number">Document number</string>
+    <string name="claim_travel_document_number">Travel document number</string>
+    <string name="claim_issue_date">Issue date</string>
+    <string name="claim_expiry_date">Expiry date</string>
+    <string name="claim_issue_date_legacy">Issue date (legacy)</string>
+    <string name="claim_evidence">Evidence</string>
+    <string name="claim_source_document">Source document</string>
+    <string name="claim_document_country">Document country</string>
+    <string name="claim_document_expiry">Document expiry</string>
+    <string name="claim_checks">Checks</string>
+    <string name="claim_dtc_version">DTC version</string>
+    <string name="claim_dtc_sod">eMRTD security object</string>
+    <string name="claim_dtc_dg1">eMRTD DG1</string>
+    <string name="claim_dtc_dg2">eMRTD DG2</string>
+    <string name="namespace_identity">Identity</string>
+    <string name="namespace_how_verified">How it was verified</string>
+    <string name="namespace_photo_id">Photo ID</string>
+    <string name="namespace_dtc">Digital Travel Credential (chip data)</string>
+    <string name="namespace_age">Age</string>
+    <string name="doctype_age_verification">Age verification</string>
+    <string name="doctype_mdl">Mobile driving licence</string>
+    <string name="value_yes">Yes</string>
+    <string name="value_no">No</string>
+    <string name="value_bytes">%1$d bytes</string>
+    <string name="value_bytes_binary">%1$d bytes (binary)</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_group_activity">Activity</string>
+    <string name="settings_activity_row_title">Wallet activity history</string>
+    <string name="settings_activity_none">No activity yet</string>
+    <string name="settings_activity_summary">%1$d event(s) · latest: %2$s</string>
+    <string name="settings_group_security">Security</string>
+    <string name="settings_unlock_method">Unlock method</string>
+    <string name="settings_unlock_pin">Wallet PIN</string>
+    <string name="settings_unlock_biometric">Biometrics / device screen lock</string>
+    <string name="settings_unlock_none">Not set</string>
+    <string name="settings_confirm_before_sharing">Confirm before sharing</string>
+    <string name="settings_confirm_before_sharing_body">Ask for your PIN or biometrics each time data is shared</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_system">Match device</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_language_french">Français</string>
+    <string name="settings_group_issuer">Issuer</string>
+    <string name="settings_issuer_backend">PID issuer backend</string>
+    <string name="settings_issuer_portal_row">Issuer portal (credential offers)</string>
+    <string name="settings_issuer_iaca_row">Issuer IACA certificate (for verifiers)</string>
+    <string name="settings_group_about">About</string>
+    <string name="settings_how_it_works">How it works</string>
+    <string name="settings_replay_tutorial">Replay the tutorial</string>
+    <string name="settings_about_wallet_version">%1$s %2$s</string>
+    <string name="settings_about_wallet_detail">Wallet unit %1$s · test issuer, not for production use</string>
+    <string name="dialog_issuer_backend_title">PID issuer backend</string>
+    <string name="label_url">URL</string>
+
+    <!-- Wallet security (setup, lock, authenticator) -->
+    <string name="activity_security_changed_title">Unlock method changed</string>
+    <string name="activity_wallet_created_title">Wallet initialised</string>
+    <string name="activity_biometric_device_lock">Biometrics / device lock</string>
+    <string name="activity_wallet_created_detail">Wallet unit %1$s · protected by %2$s</string>
+    <string name="activity_protected_by_pin">a wallet PIN</string>
+    <string name="activity_protected_by_biometric">biometrics / device lock</string>
+    <string name="security_enable_biometric_title">Enable biometric unlock</string>
+    <string name="security_confirm_its_you">Confirm it\'s you</string>
+    <string name="security_pin_too_weak">Too easy to guess — choose another PIN</string>
+    <string name="security_pin_mismatch">PINs did not match — start again</string>
+    <string name="security_change_unlock_title">Change how you unlock</string>
+    <string name="security_protect_wallet_title">Protect your wallet</string>
+    <string name="security_protect_wallet_body">Your wallet holds your identity. Choose how you unlock it and confirm each time you share data with a relying party.</string>
+    <string name="security_biometrics_title">Biometrics</string>
+    <string name="security_biometrics_body_available">Fingerprint or face unlock of this phone (falls back to the phone\'s screen lock).</string>
+    <string name="security_biometrics_body_unavailable">Not available: set up a fingerprint / face unlock or a screen lock on this phone first.</string>
+    <string name="security_wallet_pin_title">Wallet PIN</string>
+    <string name="security_wallet_pin_body">A 6-digit PIN used only by this wallet.</string>
+    <string name="security_create_pin_title">Create a wallet PIN</string>
+    <string name="security_confirm_pin_title">Confirm your PIN</string>
+    <string name="security_create_pin_subtitle">Choose 6 digits. Avoid dates and simple sequences.</string>
+    <string name="security_confirm_pin_subtitle">Enter the same 6 digits again</string>
+    <string name="security_unlock_wallet_title">Unlock %1$s</string>
+    <string name="security_wrong_pin">Wrong PIN (%1$d failed attempt(s))</string>
+    <string name="security_enter_pin_title">Enter your wallet PIN</string>
+    <string name="security_cooldown">Too many attempts. Try again in %1$d s</string>
+    <string name="security_wallet_locked">%1$s is locked</string>
+    <string name="security_unlock_action">Unlock</string>
+    <string name="security_enter_pin_subtitle">Enter your wallet PIN</string>
+    <string name="security_pin_cooldown_wait">Too many attempts — wait %1$d s</string>
+    <string name="security_wrong_pin_simple">Wrong PIN</string>
+
+    <!-- Presentation / sharing -->
+    <string name="present_title_in_person">Share in person</string>
+    <string name="present_title_review">Review request</string>
+    <string name="present_title_share">Share</string>
+    <string name="present_connecting">Connecting to the verifier…</string>
+    <string name="present_let_verifier_scan">Let the verifier scan this code</string>
+    <string name="present_qr_content_desc">Device engagement QR code</string>
+    <string name="present_nothing_shared_yet">Nothing is shared yet: you will see who is asking and what, and decide.</string>
+    <string name="present_keep_bluetooth_on">Keep Bluetooth on</string>
+    <string name="present_or_tap_nfc">Or tap an NFC reader</string>
+    <string name="present_connected_waiting">Connected — waiting for the verifier\'s request…</string>
+    <string name="present_sending">Sending your data securely…</string>
+    <string name="present_shared_successfully">Shared successfully</string>
+    <string name="present_with_verifier">with %1$s</string>
+    <string name="present_shared_summary">%1$d attribute(s): %2$s</string>
+    <string name="present_continue_on_website">Continue on the website</string>
+    <string name="present_done">Done</string>
+    <string name="present_sharing_failed">Sharing failed</string>
+    <string name="present_registered_rp">Registered relying party</string>
+    <string name="present_identity_not_confirmed">Identity not confirmed by a trusted list</string>
+    <string name="present_wants_to_see">wants to see</string>
+    <string name="present_option_n">Option %1$d</string>
+    <string name="present_your_credential">Your credential</string>
+    <string name="present_will_be_stored">will be stored</string>
+    <string name="present_only_attributes_shared">Only the attributes above are shared, signed by your wallet. Check the verifier before you share.</string>
+
+    <!-- Scan QR / credential offer -->
+    <string name="scan_title">Scan QR code</string>
+    <string name="scan_hint_camera_allowed">Point at a QR code shown by a website or a verifier to share your data, or by an issuer to add a credential.</string>
+    <string name="scan_hint_camera_denied">Camera permission is needed to scan. You can paste a link instead.</string>
+    <string name="scan_hint_share_website">Share with a website</string>
+    <string name="scan_hint_get_credential">Get a credential</string>
+    <string name="scan_paste_link">Paste a link</string>
+    <string name="scan_not_wallet_qr_title">Not a wallet QR code</string>
+    <string name="scan_not_wallet_qr_body">This code is not a presentation request or a credential offer:\n\n%1$s</string>
+    <string name="scan_again">Scan again</string>
+    <string name="scan_paste_link_title">Paste a link</string>
+    <string name="scan_paste_link_placeholder">openid4vp://… or openid-credential-offer://…</string>
+    <string name="scan_open">Open</string>
+    <string name="offer_add_to_wallet_title">Add to wallet</string>
+    <string name="offer_reading">Reading the offer…</string>
+    <string name="offer_offers_to_add">offers to add to your wallet:</string>
+    <string name="offer_transaction_code">Transaction code</string>
+    <string name="offer_tx_code_hint">The issuer gave you this code separately%1$s</string>
+    <string name="offer_tx_code_length"> (%1$d characters)</string>
+    <string name="offer_added_to_wallet">Added to your wallet</string>
+    <string name="offer_nothing_added">Nothing was added</string>
+    <string name="offer_deferred_item">⏳ %1$s (the issuer will deliver it later)</string>
+    <string name="offer_go_to_wallet">Go to wallet</string>
+    <string name="offer_could_not_add">Could not add the credential</string>
+    <string name="offer_could_not_read">Could not read the offer: %1$s</string>
+    <string name="offer_connecting_to">Connecting to %1$s…</string>
+    <string name="offer_requesting_n">Requesting %1$d credential(s)…</string>
+    <string name="offer_stored_n">Stored %1$s</string>
+    <string name="offer_wrong_tx_code">Wrong transaction code</string>
+
+    <!-- Selfie / liveness -->
+    <string name="selfie_verify_title">Verify it\'s you</string>
+    <string name="selfie_take_live_selfie">Take a live selfie</string>
+    <string name="selfie_intro_body">The issuer compares your face with the portrait on your document (chip or photo) before issuing your PID. You\'ll be asked to blink and turn your head — this shows it\'s really you in front of the camera, not a photo.</string>
+    <string name="selfie_camera_permission_needed">Camera permission is needed for the selfie.</string>
+    <string name="selfie_skip">Skip (issuer may refuse, lower assurance)</string>
+    <string name="selfie_sending">Great — sending to the issuer…</string>
+    <string name="selfie_tip_light">Good, even light on your face</string>
+    <string name="selfie_tip_remove_accessories">Remove sunglasses, hat or mask</string>
+    <string name="selfie_tip_eye_level">Hold the phone at eye level</string>
+    <string name="liveness_look_straight">Look straight at the camera</string>
+    <string name="liveness_blink_slowly">Blink slowly</string>
+    <string name="liveness_turn_one_side">Turn your head slowly to one side</string>
+    <string name="liveness_turn_other_side">Now turn your head to the other side</string>
+    <string name="liveness_done">Done</string>
+
+    <!-- Activity history -->
+    <string name="activity_history_title">Activity history</string>
+    <string name="activity_clear_history">Clear history</string>
+    <string name="activity_filter_all">All</string>
+    <string name="activity_filter_sharing">Sharing</string>
+    <string name="activity_filter_credentials">Credentials</string>
+    <string name="activity_filter_security">Security</string>
+    <string name="activity_nothing_here_yet">Nothing here yet</string>
+    <string name="activity_nothing_here_body">Credentials you add and data you share appear here. The history stays on this phone.</string>
+    <string name="activity_clear_confirm_title">Clear activity history?</string>
+    <string name="activity_clear_confirm_body">This removes the local history only; credentials are not affected.</string>
+    <string name="activity_clear_action">Clear</string>
+    <string name="activity_today">Today</string>
+    <string name="activity_yesterday">Yesterday</string>
+    <string name="activity_shared_label">Shared:</string>
+    <string name="activity_items_label">Items:</string>
+    <string name="activity_issuance_failed">Issuance failed</string>
+    <string name="activity_added_n">Added %1$s</string>
+    <string name="activity_declined_offer">Declined offer</string>
+    <string name="activity_declined_request">Declined request</string>
+    <string name="activity_shared_attributes">Shared %1$d attribute(s)</string>
+    <string name="activity_sharing_failed">Sharing failed</string>
+    <string name="transport_in_person">In person</string>
+    <string name="transport_online">Online (OpenID4VP)</string>
+    <string name="presentation_verifier_disconnected">The verifier disconnected</string>
+    <string name="presentation_invalid_request">Invalid request: %1$s</string>
+    <string name="presentation_credential_not_held">You do not hold a matching credential</string>
+    <string name="presentation_unknown_verifier">Unknown verifier</string>
+    <string name="wallet_repo_document_fallback">this document</string>
+    <string name="wallet_repo_deleted_title">Deleted %1$s</string>
+    <string name="wallet_repo_deleted_detail">Removed from this device</string>
+    <string name="wallet_repo_pid_from_chip">PID from chip</string>
+    <string name="wallet_repo_pid_from_scan">PID from scan</string>
+    <string name="wallet_repo_pid_not_issued">PID was not issued</string>
+    <string name="wallet_repo_added_pid">Added your PID</string>
+    <string name="wallet_repo_pid_issuance_failed">PID issuance failed</string>
+    <string name="vm_working_hold_document">Hold the document still against the phone…</string>
+    <string name="vm_working_verifying_chip_selfie">Verifying chip, matching your selfie and issuing PID…</string>
+    <string name="vm_working_verifying_chip">Verifying chip and issuing PID…</string>
+    <string name="vm_working_reading_document">Reading document text…</string>
+    <string name="vm_working_validating_document_selfie">Validating document, matching your selfie and issuing PID…</string>
+    <string name="vm_working_validating_document">Validating document and issuing PID…</string>
+    <string name="error_tag_lost">Connection to the chip was lost. Keep the document on the phone until reading completes.</string>
+    <string name="error_cannot_reach_issuer">Cannot reach the issuer at %1$s. Check Settings.</string>
+    <string name="error_chip_access_denied">Access denied by the chip: check document number, date of birth and expiry (or CAN).</string>
+
+    <!-- MRZ / access key -->
+    <string name="mrz_unlock_chip_title">Unlock the chip</string>
+    <string name="mrz_tab_scan">Scan MRZ</string>
+    <string name="mrz_tab_manual">Enter manually</string>
+    <string name="mrz_camera_permission_required">Camera permission is required to scan the MRZ.</string>
+    <string name="mrz_camera_instructions">Point the camera at the two or three lines of &lt;&lt;&lt; characters at the bottom of the passport photo page (or the back of the ID card).</string>
+    <string name="mrz_data_title">MRZ data (BAC / PACE)</string>
+    <string name="mrz_document_number">Document number</string>
+    <string name="mrz_date_of_birth">Date of birth (YYMMDD)</string>
+    <string name="mrz_date_of_expiry">Date of expiry (YYMMDD)</string>
+    <string name="mrz_continue_with_mrz">Continue with MRZ</string>
+    <string name="mrz_or_separator">— or —</string>
+    <string name="mrz_can_title">Card Access Number (PACE, ID cards)</string>
+    <string name="mrz_can_label">6-digit CAN printed on the card</string>
+    <string name="mrz_continue_with_can">Continue with CAN</string>
+
+    <!-- NFC chip read -->
+    <string name="nfc_read_chip_title">Read the chip</string>
+    <string name="nfc_unavailable_body">This phone has no NFC reader, so the document chip cannot be read.</string>
+    <string name="nfc_scan_images_instead">Scan document images instead</string>
+    <string name="nfc_disabled_body">NFC is switched off.</string>
+    <string name="nfc_turn_on">Turn on NFC</string>
+    <string name="nfc_hold_again_to_retry">Hold the document to the phone again to retry.</string>
+    <string name="nfc_cant_read_scan_instead">Can\'t read the chip? Scan images instead</string>
+    <string name="nfc_hold_phone_instructions">Hold the phone against the passport photo page or the ID card.</string>
+    <string name="nfc_using_can">Using CAN ••••%1$s</string>
+    <string name="nfc_document_number">Document %1$s</string>
+    <string name="nfc_no_access_key">No access key — go back and scan the MRZ</string>
+    <string name="nfc_dont_move_document">Don\'t move the document until reading completes (5–20 s).</string>
+
+    <!-- Document scan -->
+    <string name="scan_document_title">Scan document</string>
+    <string name="scan_kind_passport">Passport</string>
+    <string name="scan_kind_id_card">ID card</string>
+    <string name="scan_instructions_back">Now the BACK of the card (with the MRZ). Hold it in the frame — it is captured automatically — or capture/upload manually.</string>
+    <string name="scan_instructions_passport">Hold the passport photo page in the frame on a dark, plain surface, avoiding glare. It is captured automatically once the MRZ is readable.</string>
+    <string name="scan_instructions_id_front">Hold the FRONT of the ID card (with the portrait) in the frame. It is captured automatically once the text is readable.</string>
+    <string name="scan_auto_capture">Auto capture</string>
+    <string name="scan_camera_permission_not_granted">Camera permission not granted — you can still upload images.</string>
+    <string name="scan_capturing">Capturing…</string>
+    <string name="scan_capture_back">Capture back</string>
+    <string name="scan_capture">Capture</string>
+    <string name="scan_upload_image_back">Image (back)</string>
+    <string name="scan_upload_image">Upload image</string>
+    <string name="scan_upload_pdf_back">PDF (back)</string>
+    <string name="scan_upload_pdf">Upload PDF</string>
+    <string name="scan_id_card_pdf_hint">ID card PDF: page 1 = front, page 2 = back (a single page with both sides also works).</string>
+    <string name="scan_front_label">Front</string>
+    <string name="scan_back_label">Back</string>
+    <string name="scan_front_back_one_page">Front + back on one page</string>
+    <string name="scan_start_over">Start over</string>
+    <string name="scan_continue">Continue</string>
+    <string name="scan_could_not_read_image">Could not read the selected image</string>
+    <string name="scan_could_not_read_pdf">Could not read the selected PDF</string>
+
+    <!-- Auto capture overlay -->
+    <string name="autocapture_captured">Captured</string>
+    <string name="autocapture_hold_still">Hold still…</string>
+    <string name="autocapture_move_closer">Move closer — fill the frame</string>
+    <string name="autocapture_wrong_side">This is the back — show the FRONT first</string>
+    <string name="autocapture_looking_mrz">Looking for the MRZ (&lt;&lt;&lt; lines)…</string>
+    <string name="autocapture_looking_card">Looking for the card front…</string>
+
+    <!-- Result -->
+    <string name="result_your_pid_title">Your PID</string>
+    <string name="result_may_take_a_minute">This can take up to a minute when the issuer has been idle.</string>
+    <string name="result_something_went_wrong">Something went wrong</string>
+    <string name="result_back_to_wallet">Back to wallet</string>
+    <string name="result_no_result">No result</string>
+    <string name="result_pid_in_wallet">Your PID is in your wallet</string>
+    <string name="result_also_available">Also available from the same check</string>
+    <string name="result_add_attestations">Add attestations</string>
+    <string name="result_pid_not_issued">PID not issued</string>
+    <string name="result_document_score">Document score %1$s</string>
+    <string name="result_verification_report">Verification report</string>
 </resources>

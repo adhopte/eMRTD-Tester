@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -71,42 +72,37 @@ private data class TutorialPage(
     val illustration: @Composable () -> Unit,
 )
 
-private val pages = listOf(
+@Composable
+private fun tutorialPages(): List<TutorialPage> = listOf(
     TutorialPage(
-        "Welcome to getYourID Wallet",
-        "Turn your passport or ID card into a digital European identity (PID), issued by IN Groupe and " +
-            "kept securely on this phone.",
+        stringResource(R.string.tutorial_page1_title, stringResource(R.string.app_name)),
+        stringResource(R.string.tutorial_welcome_body),
     ) { WelcomeIllustration() },
     TutorialPage(
-        "1 · Scan the MRZ",
-        "Chip documents: point the camera at the two or three lines of <<< characters at the bottom of the " +
-            "passport photo page or on the back of the ID card. They are read automatically.",
+        stringResource(R.string.tutorial_page2_title),
+        stringResource(R.string.tutorial_page2_body),
     ) { MrzScanIllustration() },
     TutorialPage(
-        "2 · Hold the chip to your phone",
-        "Place the phone flat on the passport (or the ID card) and keep still. The chip is read over NFC and " +
-            "checked by IN Groupe — Passive, Active and Chip Authentication.",
+        stringResource(R.string.tutorial_page3_title),
+        stringResource(R.string.tutorial_nfc_body),
     ) { NfcIllustration() },
     TutorialPage(
-        "3 · Take a live selfie",
-        "Blink and turn your head when asked, then look at the camera. IN Groupe compares your face with the " +
-            "photo from the chip or the document before issuing your PID.",
+        stringResource(R.string.tutorial_page4_title),
+        stringResource(R.string.tutorial_selfie_body),
     ) { SelfieIllustration() },
     TutorialPage(
-        "No chip or no NFC? Auto scan",
-        "Choose \"Scan document\". Hold the ID card front, then the back, inside the frame — each side is " +
-            "captured automatically when it is sharp and steady. You can also upload a photo or PDF.",
+        stringResource(R.string.tutorial_page5_title),
+        stringResource(R.string.tutorial_page5_body),
     ) { CardAutoScanIllustration() },
     TutorialPage(
-        "Scan · Share · Add",
-        "Tap Scan to read a website's QR code and share your data, or an issuer's QR code to add a credential " +
-            "such as a photo ID or proof of age. Show QR shares in person. You see who is asking and confirm " +
-            "with your PIN or fingerprint.",
+        stringResource(R.string.tutorial_page6_title),
+        stringResource(R.string.tutorial_page6_body),
     ) { ShareIllustration() },
 )
 
 @Composable
 fun TutorialScreen(onFinish: () -> Unit) {
+    val pages = tutorialPages()
     val pager = rememberPagerState { pages.size }
     val scope = rememberCoroutineScope()
     val last = pager.currentPage == pages.lastIndex
@@ -114,9 +110,9 @@ fun TutorialScreen(onFinish: () -> Unit) {
         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).systemBarsPadding().padding(20.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Image(painterResource(R.drawable.logo_ingroupe), "IN Groupe", Modifier.height(36.dp))
+            BrandLockup(emblemSize = 30.dp, textStyle = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.weight(1f))
-            if (!last) TextButton(onClick = onFinish) { Text("Skip") }
+            if (!last) TextButton(onClick = onFinish) { Text(stringResource(R.string.action_skip)) }
         }
         HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { index ->
             val page = pages[index]
@@ -152,13 +148,13 @@ fun TutorialScreen(onFinish: () -> Unit) {
                     val selected = i == pager.currentPage
                     Box(
                         Modifier.height(8.dp).width(if (selected) 24.dp else 8.dp).clip(CircleShape)
-                            .background(if (selected) InGroupe.Red else InGroupe.Grey),
+                            .background(if (selected) Brand.Red else Brand.Grey),
                     )
                 }
             }
             Button(onClick = {
                 if (last) onFinish() else scope.launch { pager.animateScrollToPage(pager.currentPage + 1) }
-            }) { Text(if (last) "Get started" else "Next") }
+            }) { Text(stringResource(if (last) R.string.action_get_started else R.string.action_next)) }
         }
     }
 }
@@ -187,10 +183,10 @@ private fun WelcomeIllustration() {
     Box(contentAlignment = Alignment.Center) {
         Canvas(Modifier.size(260.dp)) {
             val r = size.minDimension / 2
-            drawCircle(InGroupe.SkyBlue.copy(alpha = (1f - ring) * 0.5f), radius = r * (0.55f + 0.45f * ring),
+            drawCircle(Brand.SkyBlue.copy(alpha = (1f - ring) * 0.5f), radius = r * (0.55f + 0.45f * ring),
                 style = Stroke(width = 3.dp.toPx()))
         }
-        Image(painterResource(R.drawable.ic_ingroupe_emblem), null, Modifier.size(150.dp).scale(pulse))
+        Image(painterResource(R.drawable.ic_brand_emblem), null, Modifier.size(150.dp).scale(pulse))
     }
 }
 
@@ -202,16 +198,16 @@ private fun DocumentMock(
     showMrz: Boolean = true,
     showPortrait: Boolean = true,
     mrzHighlight: Float = 0f,
-    title: String = "PASSPORT",
+    title: String = stringResource(R.string.illus_passport_label),
 ) {
     Box(
         modifier.width(width).height(width * 0.72f).clip(RoundedCornerShape(12.dp))
             .background(Brush.linearGradient(listOf(Color(0xFFFDFDFE), Color(0xFFE6F0FB))))
-            .border(1.dp, InGroupe.Grey, RoundedCornerShape(12.dp))
+            .border(1.dp, Brand.Grey, RoundedCornerShape(12.dp))
             .padding(10.dp),
     ) {
         Column {
-            Text(title, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = InGroupe.Navy)
+            Text(title, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Brand.Navy)
             Row(Modifier.padding(top = 4.dp)) {
                 if (showPortrait) {
                     Box(Modifier.size(width * 0.2f, width * 0.25f).clip(RoundedCornerShape(4.dp)).background(Color(0xFFB9C7DE))) {
@@ -228,7 +224,7 @@ private fun DocumentMock(
             }
         }
         if (showMrz) {
-            val glow = InGroupe.SkyBlue.copy(alpha = 0.35f * mrzHighlight)
+            val glow = Brand.SkyBlue.copy(alpha = 0.35f * mrzHighlight)
             Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(glow, RoundedCornerShape(4.dp))) {
                 listOf("P<UTOERIKSSON<<ANNA<MARIA<<<<<<<", "L898902C36UTO7408122F1204159<<<").forEach {
                     Text(it, fontFamily = FontFamily.Monospace, fontSize = 8.sp, color = Color(0xFF333A4D), maxLines = 1)
@@ -259,12 +255,12 @@ private fun MrzScanIllustration() {
         Canvas(Modifier.width(262.dp).height(192.dp)) {
             val bandTop = size.height * 0.7f
             val bandH = size.height * 0.28f
-            val color = if (done > 0f) Color(0xFF2E7D32) else InGroupe.SkyBlue
+            val color = if (done > 0f) Color(0xFF2E7D32) else Brand.SkyBlue
             drawRoundRect(color, Offset(0f, bandTop), Size(size.width, bandH), CornerRadius(10.dp.toPx()),
                 style = Stroke(width = 3.dp.toPx()))
             if (done == 0f && sweep > 0f) {
                 val y = bandTop + bandH * sweep
-                drawLine(InGroupe.Red, Offset(8.dp.toPx(), y), Offset(size.width - 8.dp.toPx(), y), 3.dp.toPx())
+                drawLine(Brand.Red, Offset(8.dp.toPx(), y), Offset(size.width - 8.dp.toPx(), y), 3.dp.toPx())
             }
         }
         if (done > 0f) {
@@ -283,11 +279,11 @@ private fun NfcIllustration() {
     Box(Modifier.size(300.dp, 280.dp), contentAlignment = Alignment.Center) {
         // Passport cover
         Box(
-            Modifier.size(170.dp, 230.dp).offset(x = (-30).dp, y = 10.dp).clip(RoundedCornerShape(10.dp)).background(InGroupe.Navy),
+            Modifier.size(170.dp, 230.dp).offset(x = (-30).dp, y = 10.dp).clip(RoundedCornerShape(10.dp)).background(Brand.Navy),
             contentAlignment = Alignment.TopCenter,
         ) {
             Column(Modifier.padding(top = 36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("PASSPORT", color = Color(0xFFE8C66A), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text(stringResource(R.string.illus_passport_label), color = Color(0xFFE8C66A), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Box(Modifier.padding(top = 10.dp).size(28.dp, 18.dp).border(2.dp, Color(0xFFE8C66A), RoundedCornerShape(3.dp)))
             }
         }
@@ -296,7 +292,7 @@ private fun NfcIllustration() {
             Canvas(Modifier.size(260.dp)) {
                 repeat(3) { i ->
                     val w = ((reading * 3f + i / 3f) % 1f)
-                    drawCircle(InGroupe.SkyBlue.copy(alpha = 1f - w), radius = size.minDimension / 2 * (0.3f + 0.7f * w),
+                    drawCircle(Brand.SkyBlue.copy(alpha = 1f - w), radius = size.minDimension / 2 * (0.3f + 0.7f * w),
                         style = Stroke(width = 3.dp.toPx()))
                 }
             }
@@ -306,12 +302,13 @@ private fun NfcIllustration() {
             Column(Modifier.align(Alignment.Center).padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (done > 0f) {
                     Icon(Icons.Filled.CheckCircle, null, tint = Color(0xFF2E7D32), modifier = Modifier.size(40.dp))
-                    Text("Chip verified", fontSize = 10.sp, color = InGroupe.Navy, textAlign = TextAlign.Center)
+                    Text(stringResource(R.string.illus_chip_verified), fontSize = 10.sp, color = Brand.Navy, textAlign = TextAlign.Center)
                 } else {
-                    Icon(Icons.Filled.Nfc, null, tint = InGroupe.Blue, modifier = Modifier.size(34.dp))
-                    Text(if (reading > 0f) "Reading chip…" else "Hold still", fontSize = 10.sp, color = InGroupe.Navy)
+                    Icon(Icons.Filled.Nfc, null, tint = Brand.Blue, modifier = Modifier.size(34.dp))
+                    Text(stringResource(if (reading > 0f) R.string.illus_reading_chip else R.string.illus_hold_still),
+                        fontSize = 10.sp, color = Brand.Navy)
                     LinearProgressIndicator(progress = { reading }, modifier = Modifier.padding(top = 8.dp).width(80.dp),
-                        color = InGroupe.Red, trackColor = InGroupe.LightGrey)
+                        color = Brand.Red, trackColor = Brand.LightGrey)
                 }
             }
         }
@@ -333,13 +330,13 @@ private fun CardAutoScanIllustration() {
         holding -> Color(0xFFF9A825)
         else -> Color.White
     }
-    val label = when {
-        frontCaptured -> "Front captured"
-        backCaptured -> "Back captured"
-        holding -> "Hold still…"
-        back -> "Now the back"
-        else -> "Looking for the card…"
-    }
+    val label = stringResource(when {
+        frontCaptured -> R.string.illus_front_captured
+        backCaptured -> R.string.illus_back_captured
+        holding -> R.string.illus_hold_still
+        back -> R.string.illus_now_the_back
+        else -> R.string.illus_looking_for_card
+    })
     Box(Modifier.size(300.dp, 280.dp), contentAlignment = Alignment.Center) {
         // Camera preview
         Box(Modifier.size(280.dp, 250.dp).clip(RoundedCornerShape(20.dp)).background(Color(0xFF2B3350)))
@@ -351,7 +348,7 @@ private fun CardAutoScanIllustration() {
             width = 220.dp,
             showMrz = back,
             showPortrait = !back,
-            title = if (back) "" else "IDENTITY CARD",
+            title = if (back) "" else stringResource(R.string.illus_identity_card_label),
             mrzHighlight = if (backCaptured) 1f else 0f,
         )
         Canvas(Modifier.size(236.dp, 150.dp)) {
@@ -382,7 +379,7 @@ private fun ShareIllustration() {
                 for (y in 0 until n) for (x in 0 until n) {
                     val finder = (x < 3 && y < 3) || (x >= n - 3 && y < 3) || (x < 3 && y >= n - 3)
                     if (finder || (x * 7 + y * 13 + x * y) % 3 == 0) {
-                        drawRect(InGroupe.Navy, Offset(x * cell, y * cell), Size(cell * 0.92f, cell * 0.92f))
+                        drawRect(Brand.Navy, Offset(x * cell, y * cell), Size(cell * 0.92f, cell * 0.92f))
                     }
                 }
             }
@@ -390,22 +387,22 @@ private fun ShareIllustration() {
         Canvas(Modifier.size(50.dp, 20.dp)) {
             repeat(4) { i ->
                 val a = ((beam * 4f - i).coerceIn(0f, 1f))
-                drawCircle(InGroupe.SkyBlue.copy(alpha = a), radius = 4.dp.toPx(), center = Offset(size.width * (i + 0.5f) / 4, size.height / 2))
+                drawCircle(Brand.SkyBlue.copy(alpha = a), radius = 4.dp.toPx(), center = Offset(size.width * (i + 0.5f) / 4, size.height / 2))
             }
         }
         Box(
-            Modifier.size(110.dp, 150.dp).clip(RoundedCornerShape(16.dp)).background(InGroupe.Navy).padding(10.dp),
+            Modifier.size(110.dp, 150.dp).clip(RoundedCornerShape(16.dp)).background(Brand.Navy).padding(10.dp),
             contentAlignment = Alignment.Center,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Verifier", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.illus_verifier_label), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(10.dp))
                 if (done > 0f) {
                     Icon(Icons.Filled.CheckCircle, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(40.dp).scale(done))
-                    Text("Over 18 ✓", color = Color.White, fontSize = 10.sp)
+                    Text(stringResource(R.string.illus_over18_check), color = Color.White, fontSize = 10.sp)
                 } else {
-                    Box(Modifier.size(40.dp).border(2.dp, InGroupe.SkyBlue, RoundedCornerShape(8.dp)))
-                    Text("Waiting…", color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp)
+                    Box(Modifier.size(40.dp).border(2.dp, Brand.SkyBlue, RoundedCornerShape(8.dp)))
+                    Text(stringResource(R.string.illus_waiting), color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp)
                 }
             }
         }
@@ -429,15 +426,11 @@ private fun SelfieIllustration() {
                 drawOval(if (ok) Color(0xFF4CAF50) else Color.White, style = Stroke(width = 3.dp.toPx()))
             }
             Icon(
-                Icons.Filled.Face, null, tint = InGroupe.SkyBlue,
+                Icons.Filled.Face, null, tint = Brand.SkyBlue,
                 modifier = Modifier.size(72.dp).offset(x = (turn * 10).dp).graphicsLayer { rotationY = turn * 35f },
             )
             Text(
-                when {
-                    ok -> "✓"
-                    p < 0.5f -> "Turn left"
-                    else -> "Turn right"
-                },
+                if (ok) "✓" else stringResource(if (p < 0.5f) R.string.illus_turn_left else R.string.illus_turn_right),
                 color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
             )

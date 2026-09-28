@@ -11,12 +11,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import io.github.adhopte.emrtdwallet.IncomingLink
+import io.github.adhopte.emrtdwallet.R
 
 object Routes {
     const val TUTORIAL = "tutorial"
@@ -96,7 +98,8 @@ fun AppNavigation(incoming: IncomingLink?, onIncomingConsumed: () -> Unit) {
             composable(Routes.CHANGE_SECURITY) {
                 val auth = rememberAuthenticator(vm.lock, forSharing = false)
                 var confirmed by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) { auth.request("Change unlock method") { confirmed = true } }
+                val changeSecurityReason = stringResource(R.string.auth_reason_change_security)
+                LaunchedEffect(Unit) { auth.request(changeSecurityReason) { confirmed = true } }
                 if (confirmed) SetupSecurityScreen(vm.lock, vm.activity, changing = true) { nav.popBackStack() }
                 else TutorialBackdrop()
             }

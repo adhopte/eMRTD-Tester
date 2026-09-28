@@ -46,8 +46,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import io.github.adhopte.emrtdwallet.R
 import io.github.adhopte.emrtdwallet.data.ActivityEntry
 import io.github.adhopte.emrtdwallet.data.ActivityType
 import java.time.Instant
@@ -55,21 +57,29 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-private enum class ActivityFilter(val label: String, val types: Set<ActivityType>?) {
-    ALL("All", null),
-    SHARING("Sharing", setOf(ActivityType.PRESENTED, ActivityType.PRESENTATION_DECLINED, ActivityType.PRESENTATION_FAILED)),
-    CREDENTIALS("Credentials", setOf(ActivityType.ISSUED, ActivityType.ISSUANCE_REJECTED, ActivityType.ISSUANCE_FAILED, ActivityType.DELETED)),
-    SECURITY("Security", setOf(ActivityType.WALLET_CREATED, ActivityType.SECURITY_CHANGED)),
+private enum class ActivityFilter(val types: Set<ActivityType>?) {
+    ALL(null),
+    SHARING(setOf(ActivityType.PRESENTED, ActivityType.PRESENTATION_DECLINED, ActivityType.PRESENTATION_FAILED)),
+    CREDENTIALS(setOf(ActivityType.ISSUED, ActivityType.ISSUANCE_REJECTED, ActivityType.ISSUANCE_FAILED, ActivityType.DELETED)),
+    SECURITY(setOf(ActivityType.WALLET_CREATED, ActivityType.SECURITY_CHANGED)),
 }
 
+@Composable
+private fun ActivityFilter.label(): String = stringResource(when (this) {
+    ActivityFilter.ALL -> R.string.activity_filter_all
+    ActivityFilter.SHARING -> R.string.activity_filter_sharing
+    ActivityFilter.CREDENTIALS -> R.string.activity_filter_credentials
+    ActivityFilter.SECURITY -> R.string.activity_filter_security
+})
+
 private fun ActivityType.visual(): Pair<ImageVector, Color> = when (this) {
-    ActivityType.WALLET_CREATED -> Icons.Filled.Shield to InGroupe.Blue
-    ActivityType.SECURITY_CHANGED -> Icons.Filled.Lock to InGroupe.Blue
+    ActivityType.WALLET_CREATED -> Icons.Filled.Shield to Brand.Blue
+    ActivityType.SECURITY_CHANGED -> Icons.Filled.Lock to Brand.Blue
     ActivityType.ISSUED -> Icons.Filled.AddCard to Color(0xFF2E7D32)
-    ActivityType.ISSUANCE_REJECTED, ActivityType.ISSUANCE_FAILED -> Icons.Filled.ErrorOutline to InGroupe.Red
-    ActivityType.PRESENTED -> Icons.Filled.Send to InGroupe.SkyBlue
+    ActivityType.ISSUANCE_REJECTED, ActivityType.ISSUANCE_FAILED -> Icons.Filled.ErrorOutline to Brand.Red
+    ActivityType.PRESENTED -> Icons.Filled.Send to Brand.SkyBlue
     ActivityType.PRESENTATION_DECLINED -> Icons.Filled.Block to Color(0xFFF9A825)
-    ActivityType.PRESENTATION_FAILED -> Icons.Filled.ErrorOutline to InGroupe.Red
+    ActivityType.PRESENTATION_FAILED -> Icons.Filled.ErrorOutline to Brand.Red
     ActivityType.DELETED -> Icons.Filled.Delete to Color.Gray
 }
 
@@ -88,8 +98,8 @@ fun ActivityHistory(entries: List<ActivityEntry>, onClear: () -> Unit, onBack: (
     val zone = ZoneId.systemDefault()
     val groups = shown.groupBy { Instant.ofEpochMilli(it.time).atZone(zone).toLocalDate() }
     Scaffold(topBar = {
-        SimpleTopBar("Activity history", onBack) {
-            if (entries.isNotEmpty()) IconButton(onClick = { confirmClear = true }) { Icon(Icons.Filled.DeleteSweep, "Clear history") }
+        SimpleTopBar(stringResource(R.string.activity_history_title), onBack) {
+            if (entries.isNotEmpty()) IconButton(onClick = { confirmClear = true }) { Icon(Icons.Filled.DeleteSweep, stringResource(R.string.activity_clear_history)) }
         }
     }) { padding ->
         LazyColumn(
@@ -98,15 +108,14 @@ fun ActivityHistory(entries: List<ActivityEntry>, onClear: () -> Unit, onBack: (
         ) {
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(ActivityFilter.entries) { f -> FilterChip(filter == f, { filter = f }, label = { Text(f.label) }) }
+                    items(ActivityFilter.entries) { f -> FilterChip(filter == f, { filter = f }, label = { Text(f.label()) }) }
                 }
             }
             if (shown.isEmpty()) item {
                 Column(Modifier.fillMaxWidth().padding(top = 64.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Filled.History, null, Modifier.size(64.dp), tint = InGroupe.Grey)
-                    Text("Nothing here yet", style = MaterialTheme.typography.titleMedium)
-                    Text("Credentials you add and data you share appear here. The history stays on this phone.",
-                        style = MaterialTheme.typography.bodySmall)
+                    Icon(Icons.Filled.History, null, Modifier.size(64.dp), tint = Brand.Grey)
+                    Text(stringResource(R.string.activity_nothing_here_yet), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.activity_nothing_here_body), style = MaterialTheme.typography.bodySmall)
                 }
             }
             groups.forEach { (day, list) ->
@@ -120,18 +129,19 @@ fun ActivityHistory(entries: List<ActivityEntry>, onClear: () -> Unit, onBack: (
     }
     if (confirmClear) AlertDialog(
         onDismissRequest = { confirmClear = false },
-        title = { Text("Clear activity history?") },
-        text = { Text("This removes the local history only; credentials are not affected.") },
-        confirmButton = { TextButton(onClick = { onClear(); confirmClear = false }) { Text("Clear") } },
-        dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
+        title = { Text(stringResource(R.string.activity_clear_confirm_title)) },
+        text = { Text(stringResource(R.string.activity_clear_confirm_body)) },
+        confirmButton = { TextButton(onClick = { onClear(); confirmClear = false }) { Text(stringResource(R.string.activity_clear_action)) } },
+        dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
+@Composable
 private fun dayLabel(day: LocalDate): String {
     val today = LocalDate.now()
     return when (day) {
-        today -> "Today"
-        today.minusDays(1) -> "Yesterday"
+        today -> stringResource(R.string.activity_today)
+        today.minusDays(1) -> stringResource(R.string.activity_yesterday)
         else -> day.format(DateTimeFormatter.ofPattern("EEEE d MMMM yyyy"))
     }
 }
@@ -158,8 +168,8 @@ private fun ActivityRow(e: ActivityEntry) {
                 if (expanded) {
                     if (e.detail.isNotBlank()) Text(e.detail, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
                     if (e.items.isNotEmpty()) {
-                        Text(if (e.type == ActivityType.PRESENTED) "Shared:" else "Items:", style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(top = 6.dp))
+                        Text(stringResource(if (e.type == ActivityType.PRESENTED) R.string.activity_shared_label else R.string.activity_items_label),
+                            style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp))
                         e.items.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
                     }
                 } else if (e.items.isNotEmpty()) {

@@ -5,10 +5,10 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.fragment.app.FragmentActivity
 import io.github.adhopte.emrtdwallet.ui.AppNavigation
 import io.github.adhopte.emrtdwallet.ui.WalletTheme
 import io.github.adhopte.emrtdwallet.wallet.OfferController
@@ -19,8 +19,10 @@ sealed interface IncomingLink {
     data class CredentialOffer(val uri: String) : IncomingLink
 }
 
-// FragmentActivity: required by BiometricPrompt
-class MainActivity : FragmentActivity() {
+// AppCompatActivity: a FragmentActivity subclass (required by BiometricPrompt) that also gives
+// AppCompatDelegate.setApplicationLocales (Settings > language) automatic locale application and
+// recreation below API 33.
+class MainActivity : AppCompatActivity() {
 
     private val app get() = application as WalletApp
 

@@ -214,6 +214,27 @@ cd android
 
 In the app, open **Settings** and set the issuer URL. The default is `http://10.0.2.2:8000`, which is your computer when running in the emulator; on a phone, use your computer's LAN IP. Debug builds allow cleartext HTTP; release builds require HTTPS.
 
+### Brand flavors and localization
+
+The app builds as two **product flavors** from the same source tree (`app/build.gradle.kts`):
+
+| Flavor | Application ID | App name | Colors |
+|---|---|---|---|
+| `ingroupe` (default) | `io.github.adhopte.emrtdwallet` | getYourID Wallet | IN Groupe blue/sky-blue |
+| `anipBenin` | `io.github.adhopte.emrtdwallet.anip` | Bénin IN Groupe POC | Bénin flag green/gold/red |
+
+Each flavor supplies its own `Brand.kt` palette object, launcher icon, emblem drawable and brand strings (`app_name`, `brand_tagline`, `issuer_display_name`, …) under `app/src/<flavor>/`; everything else is shared. Build a specific flavor with:
+
+```bash
+./gradlew :app:assembleIngroupeDebug
+./gradlew :app:assembleAnipBeninDebug
+# APKs: app/build/outputs/apk/<flavor>/debug/app-<flavor>-debug.apk
+```
+
+Both flavors point at the same backend by default. To give the ANIP Bénin flavor its own issuer, build with `-PanipIssuerUrl=https://<its-backend>` and set `PID_ISSUER_ORGANIZATION`/`PID_ISSUING_AUTHORITY` on that backend instance (see `backend/app/config.py`) so issued credentials carry the ANIP Bénin issuer name.
+
+The UI is localized into **English and French** (`values/strings.xml`, `values-fr/strings.xml`, plus per-flavor string overlays). The device's language is used by default; **Settings → Language** lets the user switch it per-app (`AppCompatDelegate.setApplicationLocales`, persisted automatically, works down to API 26).
+
 Main libraries:
 - **JMRTD 0.8.8** handles PACE (MRZ or CAN, falling back to BAC), reading the data groups, AA and the CA key exchange.
 - **ML Kit** does on-device OCR and **CameraX** handles the camera.

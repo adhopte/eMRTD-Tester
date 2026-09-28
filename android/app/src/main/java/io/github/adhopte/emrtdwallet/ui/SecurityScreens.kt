@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -98,8 +99,8 @@ fun PinPad(
                 val s by animateFloatAsState(if (filled) 1.15f else 1f, label = "dot")
                 Box(
                     Modifier.size(16.dp).scale(s).clip(CircleShape)
-                        .background(if (filled) (if (dark) Color.White else InGroupe.Blue) else Color.Transparent)
-                        .border(2.dp, if (dark) Color.White else InGroupe.Blue, CircleShape)
+                        .background(if (filled) (if (dark) Color.White else Brand.Blue) else Color.Transparent)
+                        .border(2.dp, if (dark) Color.White else Brand.Blue, CircleShape)
                 )
             }
         }
@@ -127,7 +128,7 @@ fun PinPad(
                         contentAlignment = Alignment.Center,
                     ) {
                         when (k) {
-                            "<" -> Icon(Icons.AutoMirrored.Filled.Backspace, "Delete", tint = fg)
+                            "<" -> Icon(Icons.AutoMirrored.Filled.Backspace, stringResource(R.string.action_delete), tint = fg)
                             "" -> Unit
                             else -> Text(k, fontSize = 28.sp, color = fg, fontWeight = FontWeight.Medium)
                         }
@@ -148,60 +149,69 @@ fun SetupSecurityScreen(lock: WalletLock, activity: ActivityLog, changing: Boole
     var error by remember { mutableStateOf<String?>(null) }
     val biometricOk = remember { lock.biometricAvailable() }
 
+    val securityChangedTitle = stringResource(R.string.activity_security_changed_title)
+    val walletCreatedTitle = stringResource(R.string.activity_wallet_created_title)
+    val methodPin = stringResource(R.string.settings_unlock_pin)
+    val methodBiometric = stringResource(R.string.activity_biometric_device_lock)
+    val walletCreatedDetailPin = stringResource(R.string.activity_wallet_created_detail, lock.walletUnitId.take(8), stringResource(R.string.activity_protected_by_pin))
+    val walletCreatedDetailBiometric = stringResource(R.string.activity_wallet_created_detail, lock.walletUnitId.take(8), stringResource(R.string.activity_protected_by_biometric))
+
     fun finish(method: LockMethod) {
-        if (changing) activity.add(ActivityType.SECURITY_CHANGED, "Unlock method changed",
-            if (method == LockMethod.PIN) "Wallet PIN" else "Biometrics / device lock")
-        else activity.add(ActivityType.WALLET_CREATED, "Wallet initialised",
-            "Wallet unit ${lock.walletUnitId.take(8)} · protected by " +
-                if (method == LockMethod.PIN) "a wallet PIN" else "biometrics / device lock")
+        if (changing) activity.add(ActivityType.SECURITY_CHANGED, securityChangedTitle,
+            if (method == LockMethod.PIN) methodPin else methodBiometric)
+        else activity.add(ActivityType.WALLET_CREATED, walletCreatedTitle,
+            if (method == LockMethod.PIN) walletCreatedDetailPin else walletCreatedDetailBiometric)
         onDone()
     }
+
+    val enableBiometricTitle = stringResource(R.string.security_enable_biometric_title)
+    val confirmItsYou = stringResource(R.string.security_confirm_its_you)
+    val weakPinError = stringResource(R.string.security_pin_too_weak)
+    val pinMismatchError = stringResource(R.string.security_pin_mismatch)
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding().navigationBarsPadding()) {
         when (mode) {
             null -> Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Spacer(Modifier.height(24.dp))
-                Box(Modifier.size(72.dp).clip(RoundedCornerShape(20.dp)).background(Brush.linearGradient(InGroupe.CardGradient)),
+                Box(Modifier.size(72.dp).clip(RoundedCornerShape(20.dp)).background(Brush.linearGradient(Brand.CardGradient)),
                     contentAlignment = Alignment.Center) {
                     Icon(Icons.Filled.Shield, null, tint = Color.White, modifier = Modifier.size(40.dp))
                 }
-                Text(if (changing) "Change how you unlock" else "Protect your wallet",
+                Text(stringResource(if (changing) R.string.security_change_unlock_title else R.string.security_protect_wallet_title),
                     style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("Your wallet holds your identity. Choose how you unlock it and confirm each time you share " +
-                    "data with a relying party.", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.security_protect_wallet_body), style = MaterialTheme.typography.bodyMedium)
                 SecurityOption(
-                    Icons.Filled.Fingerprint, "Biometrics",
-                    if (biometricOk) "Fingerprint or face unlock of this phone (falls back to the phone's screen lock)."
-                    else "Not available: set up a fingerprint / face unlock or a screen lock on this phone first.",
+                    Icons.Filled.Fingerprint, stringResource(R.string.security_biometrics_title),
+                    stringResource(if (biometricOk) R.string.security_biometrics_body_available else R.string.security_biometrics_body_unavailable),
                     enabled = biometricOk,
                 ) {
                     val act = context.findActivity() ?: return@SecurityOption
-                    lock.promptBiometric(act, "Enable biometric unlock", "Confirm it's you") { err ->
+                    lock.promptBiometric(act, enableBiometricTitle, confirmItsYou) { err ->
                         if (err == null) {
                             lock.setBiometric(); finish(LockMethod.BIOMETRIC)
                         } else error = err
                     }
                 }
-                SecurityOption(Icons.Filled.Pin, "Wallet PIN", "A 6-digit PIN used only by this wallet.") {
+                SecurityOption(Icons.Filled.Pin, stringResource(R.string.security_wallet_pin_title), stringResource(R.string.security_wallet_pin_body)) {
                     mode = LockMethod.PIN
                 }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
             else -> Column(Modifier.fillMaxSize().padding(top = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 PinPad(
-                    title = if (firstPin == null) "Create a wallet PIN" else "Confirm your PIN",
-                    subtitle = if (firstPin == null) "Choose 6 digits. Avoid dates and simple sequences." else "Enter the same 6 digits again",
+                    title = stringResource(if (firstPin == null) R.string.security_create_pin_title else R.string.security_confirm_pin_title),
+                    subtitle = stringResource(if (firstPin == null) R.string.security_create_pin_subtitle else R.string.security_confirm_pin_subtitle),
                     error = error,
                     onComplete = { pin ->
                         val first = firstPin
                         when {
-                            first == null && isWeak(pin) -> error = "Too easy to guess — choose another PIN"
+                            first == null && isWeak(pin) -> error = weakPinError
                             first == null -> { firstPin = pin; error = null }
-                            first != pin -> { firstPin = null; error = "PINs did not match — start again" }
+                            first != pin -> { firstPin = null; error = pinMismatchError }
                             else -> { lock.setPin(pin); finish(LockMethod.PIN) }
                         }
                     },
-                    extraAction = { TextButton(onClick = { mode = null; firstPin = null; error = null }) { Text("Back") } },
+                    extraAction = { TextButton(onClick = { mode = null; firstPin = null; error = null }) { Text(stringResource(R.string.action_back)) } },
                 )
             }
         }
@@ -241,9 +251,12 @@ fun LockScreen(lock: WalletLock) {
     val context = LocalContext.current
     var error by remember { mutableStateOf<String?>(null) }
     var cooldown by remember { mutableIntStateOf(lock.pinCooldownSeconds()) }
+    val unlockTitle = stringResource(R.string.security_unlock_wallet_title, stringResource(R.string.app_name))
+    val confirmItsYou = stringResource(R.string.security_confirm_its_you)
+    val wrongPinTemplate = stringResource(R.string.security_wrong_pin)
     fun biometric() {
         val act = context.findActivity() ?: return
-        lock.promptBiometric(act, "Unlock getYourID Wallet", "Confirm it's you") { err ->
+        lock.promptBiometric(act, unlockTitle, confirmItsYou) { err ->
             if (err == null) lock.unlock() else error = err
         }
     }
@@ -253,16 +266,16 @@ fun LockScreen(lock: WalletLock) {
     }
     Surface(Modifier.fillMaxSize()) {
         Column(
-            Modifier.fillMaxSize().background(Brush.verticalGradient(InGroupe.CardGradient)).statusBarsPadding()
+            Modifier.fillMaxSize().background(Brush.verticalGradient(Brand.CardGradient)).statusBarsPadding()
                 .navigationBarsPadding().padding(top = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Image(painterResource(R.drawable.ic_ingroupe_emblem), null, Modifier.size(64.dp))
+            Image(painterResource(R.drawable.ic_brand_emblem), null, Modifier.size(64.dp))
             Spacer(Modifier.height(24.dp))
             if (lock.method == LockMethod.PIN) {
                 PinPad(
-                    title = "Enter your wallet PIN",
-                    subtitle = if (cooldown > 0) "Too many attempts. Try again in $cooldown s" else null,
+                    title = stringResource(R.string.security_enter_pin_title),
+                    subtitle = if (cooldown > 0) stringResource(R.string.security_cooldown, cooldown) else null,
                     error = error,
                     dark = true,
                     onComplete = { pin ->
@@ -270,17 +283,17 @@ fun LockScreen(lock: WalletLock) {
                         if (lock.checkPin(pin)) lock.unlock()
                         else {
                             cooldown = lock.pinCooldownSeconds()
-                            error = "Wrong PIN (${lock.failedAttempts()} failed attempt(s))"
+                            error = String.format(wrongPinTemplate, lock.failedAttempts())
                         }
                     },
                 )
             } else {
-                Text("getYourID Wallet is locked", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.security_wallet_locked, stringResource(R.string.app_name)), color = Color.White, style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(32.dp))
                 IconButton(onClick = { biometric() }, modifier = Modifier.size(96.dp)) {
-                    Icon(Icons.Filled.Fingerprint, "Unlock", tint = Color.White, modifier = Modifier.size(72.dp))
+                    Icon(Icons.Filled.Fingerprint, stringResource(R.string.security_unlock_action), tint = Color.White, modifier = Modifier.size(72.dp))
                 }
-                Button(onClick = { biometric() }) { Text("Unlock") }
+                Button(onClick = { biometric() }) { Text(stringResource(R.string.security_unlock_action)) }
                 error?.let { Text(it, color = Color(0xFFFFB3BE), modifier = Modifier.padding(16.dp)) }
             }
         }
@@ -297,6 +310,10 @@ fun rememberAuthenticator(lock: WalletLock, forSharing: Boolean = true): Authent
     val context = LocalContext.current
     var pinRequest by remember { mutableStateOf<Pair<String, () -> Unit>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    val confirmItsYou = stringResource(R.string.security_confirm_its_you)
+    val enterPinSubtitle = stringResource(R.string.security_enter_pin_subtitle)
+    val cooldownTemplate = stringResource(R.string.security_pin_cooldown_wait)
+    val wrongPin = stringResource(R.string.security_wrong_pin_simple)
     val auth = remember(lock) {
         Authenticator { reason, onSuccess ->
             when {
@@ -304,7 +321,7 @@ fun rememberAuthenticator(lock: WalletLock, forSharing: Boolean = true): Authent
                 lock.method == LockMethod.BIOMETRIC -> {
                     val act = context.findActivity()
                     if (act == null) onSuccess()
-                    else lock.promptBiometric(act, reason, "Confirm it's you") { err -> if (err == null) onSuccess() }
+                    else lock.promptBiometric(act, reason, confirmItsYou) { err -> if (err == null) onSuccess() }
                 }
                 else -> { error = null; pinRequest = reason to onSuccess }
             }
@@ -316,16 +333,16 @@ fun rememberAuthenticator(lock: WalletLock, forSharing: Boolean = true): Authent
                 Column(Modifier.padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     PinPad(
                         title = reason,
-                        subtitle = "Enter your wallet PIN",
+                        subtitle = enterPinSubtitle,
                         error = error,
                         onComplete = { pin ->
                             if (lock.checkPin(pin)) { pinRequest = null; onSuccess() }
                             else {
                                 val wait = lock.pinCooldownSeconds()
-                                error = if (wait > 0) "Too many attempts — wait $wait s" else "Wrong PIN"
+                                error = if (wait > 0) String.format(cooldownTemplate, wait) else wrongPin
                             }
                         },
-                        extraAction = { TextButton(onClick = { pinRequest = null }) { Text("Cancel") } },
+                        extraAction = { TextButton(onClick = { pinRequest = null }) { Text(stringResource(R.string.action_cancel)) } },
                     )
                 }
             }

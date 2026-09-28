@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
@@ -40,26 +41,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import io.github.adhopte.emrtdwallet.R
 import io.github.adhopte.emrtdwallet.data.ReportSection
-
-/** IN Groupe brand palette (from the CSS custom properties and logo on ingroupe.com). */
-object InGroupe {
-    val Blue = Color(0xFF002F87)        // logo blue
-    val Navy = Color(0xFF192C70)        // --brand-blue
-    val MediumBlue = Color(0xFF0D3E96)  // --brand-medium-blue
-    val SkyBlue = Color(0xFF43B2ED)     // accent
-    val Red = Color(0xFFEA0029)         // logo red
-    val DarkRed = Color(0xFF9C2539)     // --brand-red
-    val Grey = Color(0xFFAEBBCE)        // --brand-grey
-    val LightGrey = Color(0xFFECEFF3)   // --brand-grey-2
-    val Surface = Color(0xFFF7F9FB)     // --brand-light-grey
-    val CardGradient = listOf(Navy, MediumBlue)
-}
 
 @Composable
 fun WalletTheme(content: @Composable () -> Unit) {
@@ -67,9 +59,9 @@ fun WalletTheme(content: @Composable () -> Unit) {
         darkColorScheme(
             primary = Color(0xFF9DB8FF),
             onPrimary = Color(0xFF00205E),
-            primaryContainer = InGroupe.MediumBlue,
+            primaryContainer = Brand.MediumBlue,
             onPrimaryContainer = Color.White,
-            secondary = InGroupe.SkyBlue,
+            secondary = Brand.SkyBlue,
             onSecondary = Color(0xFF00344F),
             tertiary = Color(0xFFFF8A9A),
             error = Color(0xFFFF8A9A),
@@ -81,28 +73,43 @@ fun WalletTheme(content: @Composable () -> Unit) {
         )
     } else {
         lightColorScheme(
-            primary = InGroupe.Blue,
+            primary = Brand.Blue,
             onPrimary = Color.White,
             primaryContainer = Color(0xFFDDE6F7),
-            onPrimaryContainer = InGroupe.Navy,
-            secondary = InGroupe.SkyBlue,
+            onPrimaryContainer = Brand.Navy,
+            secondary = Brand.SkyBlue,
             onSecondary = Color.White,
             secondaryContainer = Color(0xFFDCF1FC),
-            onSecondaryContainer = InGroupe.Navy,
-            tertiary = InGroupe.Red,
-            error = InGroupe.Red,
-            background = InGroupe.Surface,
-            onBackground = InGroupe.Navy,
-            surface = InGroupe.Surface,
+            onSecondaryContainer = Brand.Navy,
+            tertiary = Brand.Red,
+            error = Brand.Red,
+            background = Brand.Surface,
+            onBackground = Brand.Navy,
+            surface = Brand.Surface,
             onSurface = Color(0xFF111A3A),
-            surfaceVariant = InGroupe.LightGrey,
-            outline = InGroupe.Grey,
+            surfaceVariant = Brand.LightGrey,
+            outline = Brand.Grey,
             surfaceContainer = Color.White,
             surfaceContainerLow = Color.White,
             surfaceContainerHigh = Color.White,
         )
     }
     MaterialTheme(colorScheme = scheme, content = content)
+}
+
+/**
+ * Per-app language (English / French / "match device"), applied immediately without restarting
+ * the app. Persisted by AndroidX itself (a system service on API 33+, its own store below that),
+ * so nothing needs to be saved in [io.github.adhopte.emrtdwallet.data.AppSettings].
+ */
+fun currentAppLanguageTag(): String? =
+    androidx.appcompat.app.AppCompatDelegate.getApplicationLocales().takeIf { !it.isEmpty }?.get(0)?.language
+
+fun setAppLanguage(tag: String?) {
+    androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(
+        if (tag == null) androidx.core.os.LocaleListCompat.getEmptyLocaleList()
+        else androidx.core.os.LocaleListCompat.forLanguageTags(tag),
+    )
 }
 
 /** Requests a runtime permission once and reports whether it is granted. */
@@ -155,27 +162,48 @@ fun CameraPreview(
     AndroidView(factory = { previewView }, modifier = modifier)
 }
 
+/**
+ * The brand lockup (emblem + name) shown on the tutorial and the empty wallet screen. Built from
+ * the flavor's emblem drawable plus a localized name, instead of a baked wordmark image, so it
+ * works for any brand/locale without hand-vectorising a logotype.
+ */
+@Composable
+fun BrandLockup(modifier: Modifier = Modifier, emblemSize: Dp = 40.dp, textStyle: TextStyle = MaterialTheme.typography.titleLarge) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Image(painterResource(R.drawable.ic_brand_emblem), null, Modifier.size(emblemSize))
+        Text(
+            stringResource(R.string.app_name),
+            modifier = Modifier.padding(start = 10.dp),
+            style = textStyle,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+    }
+}
+
 @Composable
 fun StatusIcon(status: String) {
     val (icon, tint) = when (status) {
         "pass" -> Icons.Filled.CheckCircle to Color(0xFF2E7D32)
         "warn" -> Icons.Filled.Warning to Color(0xFFF9A825)
-        "fail" -> Icons.Filled.Error to InGroupe.Red
+        "fail" -> Icons.Filled.Error to Brand.Red
         else -> Icons.Filled.RemoveCircleOutline to Color.Gray
     }
     Icon(icon, contentDescription = status, tint = tint, modifier = Modifier.size(20.dp))
 }
 
-private val SECTION_TITLES = mapOf(
-    "document_data" to "Document data",
-    "passive_authentication" to "Passive Authentication",
-    "active_authentication" to "Active Authentication",
-    "chip_authentication" to "Chip Authentication",
-    "image_quality" to "Image quality",
-    "document_authenticity_heuristics" to "Authenticity checks",
-    "document_content" to "MRZ / VIZ content",
-    "biometrics" to "Selfie: face match & liveness",
-)
+@Composable
+private fun sectionTitle(name: String): String = when (name) {
+    "document_data" -> stringResource(R.string.section_document_data)
+    "passive_authentication" -> stringResource(R.string.section_passive_authentication)
+    "active_authentication" -> stringResource(R.string.section_active_authentication)
+    "chip_authentication" -> stringResource(R.string.section_chip_authentication)
+    "image_quality" -> stringResource(R.string.section_image_quality)
+    "document_authenticity_heuristics" -> stringResource(R.string.section_authenticity_checks)
+    "document_content" -> stringResource(R.string.section_mrz_viz_content)
+    "biometrics" -> stringResource(R.string.section_biometrics)
+    else -> name
+}
 
 @Composable
 fun ReportView(report: List<ReportSection>) {
@@ -187,11 +215,13 @@ fun ReportView(report: List<ReportSection>) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         StatusIcon(section.status)
                         Text(
-                            SECTION_TITLES[section.name] ?: section.name,
+                            sectionTitle(section.name),
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(start = 8.dp).weight(1f),
                         )
-                        TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Hide" else "Details") }
+                        TextButton(onClick = { expanded = !expanded }) {
+                            Text(stringResource(if (expanded) R.string.action_hide else R.string.action_details))
+                        }
                     }
                     if (expanded) {
                         section.checks.forEach { check ->

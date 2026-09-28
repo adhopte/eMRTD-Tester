@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive icon foreground: same card-in-badge emblem as ic_brand_emblem, scaled to the
+     108dp launcher canvas and kept inside the ~66dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FF008850" android:pathData="M54,21 A33,33 0 1,1 54,87 A33,33 0 1,1 54,21 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M35,39 L73,39 L79,45 L79,69 L73,75 L35,75 L29,69 L29,45 Z" />
+    <path android:fillColor="#FFD9A404" android:pathData="M39,46 A8,8 0 1,1 39,62 A8,8 0 1,1 39,46 Z" />
+    <path android:fillColor="#FF008850" android:pathData="M49,47 L74,47 L74,51 L49,51 Z" />
+    <path android:fillColor="#FF008850" android:pathData="M49,55 L68,55 L68,59 L49,59 Z" />
+    <path android:fillColor="#FFE90929" android:pathData="M35,67 L73,67 L73,71 L35,71 Z" />
+</vector>

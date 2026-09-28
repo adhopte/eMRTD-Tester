@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Bénin IN Groupe POC</string>
+    <string name="nfc_engagement_service_desc">Bénin IN Groupe POC : partagez votre PID avec un lecteur de proximité (ISO 18013-5)</string>
+    <string name="brand_tagline">par ANIP Bénin (TEST)</string>
+    <string name="brand_short_name">ANIP Bénin</string>
+    <string name="issuer_display_name">Émetteur ANIP Bénin</string>
+    <string name="issuer_portal_menu_title">Ouvrir le portail émetteur ANIP Bénin</string>
+    <string name="tutorial_welcome_body">Transformez votre passeport ou votre carte d’identité en identité numérique (PID), délivrée par ANIP Bénin et conservée en sécurité sur ce téléphone.</string>
+    <string name="tutorial_nfc_body">Posez le téléphone à plat sur le passeport (ou la carte d’identité) et ne bougez plus. La puce est lue en NFC et vérifiée par ANIP Bénin — authentification passive, active et de puce.</string>
+    <string name="tutorial_selfie_body">Clignez des yeux et tournez la tête lorsque c’est demandé, puis regardez la caméra. ANIP Bénin compare votre visage avec la photo de la puce ou du document avant de délivrer votre PID.</string>
+</resources>

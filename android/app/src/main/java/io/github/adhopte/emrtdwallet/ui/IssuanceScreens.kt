@@ -79,7 +79,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
+import io.github.adhopte.emrtdwallet.R
 import io.github.adhopte.emrtdwallet.emrtd.ChipAccessKey
 import io.github.adhopte.emrtdwallet.emrtd.MrzAnalyzer
 import io.github.adhopte.emrtdwallet.emrtd.MrzKey
@@ -91,11 +93,11 @@ import io.github.adhopte.emrtdwallet.emrtd.MrzKey
 @Composable
 fun MrzScreen(vm: MainViewModel, onContinue: () -> Unit, onBack: () -> Unit) {
     var tab by remember { mutableStateOf(0) }
-    Scaffold(topBar = { SimpleTopBar("Unlock the chip", onBack) }) { padding ->
+    Scaffold(topBar = { SimpleTopBar(stringResource(R.string.mrz_unlock_chip_title), onBack) }) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             TabRow(selectedTabIndex = tab) {
-                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Scan MRZ") })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Enter manually") })
+                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.mrz_tab_scan)) })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.mrz_tab_manual)) })
             }
             when (tab) {
                 0 -> MrzCamera(onMrz = { vm.setMrz(it); onContinue() })
@@ -111,14 +113,13 @@ fun MrzScreen(vm: MainViewModel, onContinue: () -> Unit, onBack: () -> Unit) {
 @Composable
 private fun MrzCamera(onMrz: (MrzKey) -> Unit) {
     if (!rememberCameraPermission()) {
-        Text("Camera permission is required to scan the MRZ.", Modifier.padding(16.dp))
+        Text(stringResource(R.string.mrz_camera_permission_required), Modifier.padding(16.dp))
         return
     }
     val analyzer = remember { MrzAnalyzer { key -> onMrz(key) } }
     Column(Modifier.padding(16.dp)) {
         Text(
-            "Point the camera at the two or three lines of <<< characters at the bottom of the passport " +
-                "photo page (or the back of the ID card).",
+            stringResource(R.string.mrz_camera_instructions),
             style = MaterialTheme.typography.bodyMedium,
         )
         Box(Modifier.padding(top = 12.dp).fillMaxWidth().aspectRatio(0.75f)) {
@@ -134,21 +135,21 @@ private fun ManualAccessKey(onMrz: (MrzKey) -> Unit, onCan: (String) -> Unit) {
     var exp by remember { mutableStateOf("") }
     var can by remember { mutableStateOf("") }
     Column(Modifier.padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("MRZ data (BAC / PACE)", style = MaterialTheme.typography.titleSmall)
-        OutlinedTextField(doc, { doc = it.uppercase() }, label = { Text("Document number") }, singleLine = true,
+        Text(stringResource(R.string.mrz_data_title), style = MaterialTheme.typography.titleSmall)
+        OutlinedTextField(doc, { doc = it.uppercase() }, label = { Text(stringResource(R.string.mrz_document_number)) }, singleLine = true,
             modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(dob, { dob = it.filter(Char::isDigit).take(6) }, label = { Text("Date of birth (YYMMDD)") },
+        OutlinedTextField(dob, { dob = it.filter(Char::isDigit).take(6) }, label = { Text(stringResource(R.string.mrz_date_of_birth)) },
             singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(exp, { exp = it.filter(Char::isDigit).take(6) }, label = { Text("Date of expiry (YYMMDD)") },
+        OutlinedTextField(exp, { exp = it.filter(Char::isDigit).take(6) }, label = { Text(stringResource(R.string.mrz_date_of_expiry)) },
             singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
         val key = MrzKey(doc.trim(), dob, exp)
-        Button(onClick = { onMrz(key) }, enabled = key.isComplete, modifier = Modifier.fillMaxWidth()) { Text("Continue with MRZ") }
+        Button(onClick = { onMrz(key) }, enabled = key.isComplete, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.mrz_continue_with_mrz)) }
 
-        Text("— or —", Modifier.align(Alignment.CenterHorizontally).padding(vertical = 8.dp))
-        Text("Card Access Number (PACE, ID cards)", style = MaterialTheme.typography.titleSmall)
-        OutlinedTextField(can, { can = it.filter(Char::isDigit).take(6) }, label = { Text("6-digit CAN printed on the card") },
+        Text(stringResource(R.string.mrz_or_separator), Modifier.align(Alignment.CenterHorizontally).padding(vertical = 8.dp))
+        Text(stringResource(R.string.mrz_can_title), style = MaterialTheme.typography.titleSmall)
+        OutlinedTextField(can, { can = it.filter(Char::isDigit).take(6) }, label = { Text(stringResource(R.string.mrz_can_label)) },
             singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), modifier = Modifier.fillMaxWidth())
-        Button(onClick = { onCan(can) }, enabled = can.length == 6, modifier = Modifier.fillMaxWidth()) { Text("Continue with CAN") }
+        Button(onClick = { onCan(can) }, enabled = can.length == 6, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.mrz_continue_with_can)) }
     }
 }
 
@@ -174,7 +175,7 @@ fun NfcReadScreen(vm: MainViewModel, onDone: () -> Unit, onUseImageScan: () -> U
     }
     LaunchedEffect(state) { if (state is IssuanceState.NeedSelfie) onDone() }
 
-    Scaffold(topBar = { SimpleTopBar("Read the chip", onBack) }) { padding ->
+    Scaffold(topBar = { SimpleTopBar(stringResource(R.string.nfc_read_chip_title), onBack) }) { padding ->
         Column(
             Modifier.padding(padding).padding(24.dp).fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -182,15 +183,14 @@ fun NfcReadScreen(vm: MainViewModel, onDone: () -> Unit, onUseImageScan: () -> U
         ) {
             when {
                 nfc == NfcStatus.UNAVAILABLE -> {
-                    Text("This phone has no NFC reader, so the document chip cannot be read.",
-                        style = MaterialTheme.typography.titleMedium)
-                    Button(onClick = onUseImageScan, modifier = Modifier.fillMaxWidth()) { Text("Scan document images instead") }
+                    Text(stringResource(R.string.nfc_unavailable_body), style = MaterialTheme.typography.titleMedium)
+                    Button(onClick = onUseImageScan, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.nfc_scan_images_instead)) }
                 }
                 nfc == NfcStatus.DISABLED -> {
-                    Text("NFC is switched off.", style = MaterialTheme.typography.titleMedium)
-                    Button(onClick = { openNfcSettings(context) }, modifier = Modifier.fillMaxWidth()) { Text("Turn on NFC") }
+                    Text(stringResource(R.string.nfc_disabled_body), style = MaterialTheme.typography.titleMedium)
+                    Button(onClick = { openNfcSettings(context) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.nfc_turn_on)) }
                     OutlinedButton(onClick = onUseImageScan, modifier = Modifier.fillMaxWidth()) {
-                        Text("Scan document images instead")
+                        Text(stringResource(R.string.nfc_scan_images_instead))
                     }
                 }
                 else -> {
@@ -203,23 +203,23 @@ fun NfcReadScreen(vm: MainViewModel, onDone: () -> Unit, onUseImageScan: () -> U
                         }
                         is IssuanceState.Failed -> {
                             Text(s.message, color = MaterialTheme.colorScheme.error)
-                            Text("Hold the document to the phone again to retry.")
-                            OutlinedButton(onClick = onUseImageScan) { Text("Can't read the chip? Scan images instead") }
+                            Text(stringResource(R.string.nfc_hold_again_to_retry))
+                            OutlinedButton(onClick = onUseImageScan) { Text(stringResource(R.string.nfc_cant_read_scan_instead)) }
                         }
                         else -> {
-                            Text("Hold the phone against the passport photo page or the ID card.",
+                            Text(stringResource(R.string.nfc_hold_phone_instructions),
                                 style = MaterialTheme.typography.titleMedium)
                             val k = key
                             Text(
                                 when (k) {
-                                    is ChipAccessKey.Can -> "Using CAN ••••${k.can.takeLast(2)}"
-                                    is ChipAccessKey.FromMrz -> "Document ${k.mrz.documentNumber}" +
+                                    is ChipAccessKey.Can -> stringResource(R.string.nfc_using_can, k.can.takeLast(2))
+                                    is ChipAccessKey.FromMrz -> stringResource(R.string.nfc_document_number, k.mrz.documentNumber) +
                                         if (k.mrz.name.isNotBlank()) " · ${k.mrz.name}" else ""
-                                    null -> "No access key — go back and scan the MRZ"
+                                    null -> stringResource(R.string.nfc_no_access_key)
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                             )
-                            Text("Don't move the document until reading completes (5–20 s).",
+                            Text(stringResource(R.string.nfc_dont_move_document),
                                 style = MaterialTheme.typography.bodySmall)
                         }
                     }
@@ -250,6 +250,8 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
     val scope = rememberCoroutineScope()
     var loading by remember { mutableStateOf(false) }
     var uploaded by remember { mutableStateOf(false) }
+    val couldNotReadImage = stringResource(R.string.scan_could_not_read_image)
+    val couldNotReadPdf = stringResource(R.string.scan_could_not_read_pdf)
 
     // Assign a captured or uploaded image to the next empty side (front first, then back)
     fun accept(bytes: ByteArray) {
@@ -264,7 +266,7 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
                 accept(withContext(Dispatchers.Default) { DocumentOcr.loadImage(context, uri) })
                 uploaded = true
             } catch (e: Exception) {
-                error = e.message ?: "Could not read the selected image"
+                error = e.message ?: couldNotReadImage
             } finally {
                 loading = false
             }
@@ -283,7 +285,7 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
                 uploaded = true
                 if (needBack && front != null && back == null && pages.size == 1) combinedSides = true
             } catch (e: Exception) {
-                error = e.message ?: "Could not read the selected PDF"
+                error = e.message ?: couldNotReadPdf
             } finally {
                 loading = false
             }
@@ -330,12 +332,12 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
         )
     }
 
-    Scaffold(topBar = { SimpleTopBar("Scan document", onBack) }) { padding ->
+    Scaffold(topBar = { SimpleTopBar(stringResource(R.string.scan_document_title), onBack) }) { padding ->
         Column(Modifier.padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(kind == "passport", { kind = "passport"; back = null; combinedSides = false }, label = { Text("Passport") })
-                FilterChip(kind == "id_card", { kind = "id_card" }, label = { Text("ID card") })
+                FilterChip(kind == "passport", { kind = "passport"; back = null; combinedSides = false }, label = { Text(stringResource(R.string.scan_kind_passport)) })
+                FilterChip(kind == "id_card", { kind = "id_card" }, label = { Text(stringResource(R.string.scan_kind_id_card)) })
             }
             when (val s = state) {
                 is IssuanceState.Working -> {
@@ -349,27 +351,24 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
             if (!ready) {
                 val cameraAllowed = rememberCameraPermission()
                 Text(
-                    when {
-                        capturingBack -> "Now the BACK of the card (with the MRZ). Hold it in the frame — it is " +
-                            "captured automatically — or capture/upload manually."
-                        kind == "passport" -> "Hold the passport photo page in the frame on a dark, plain surface, " +
-                            "avoiding glare. It is captured automatically once the MRZ is readable."
-                        else -> "Hold the FRONT of the ID card (with the portrait) in the frame. " +
-                            "It is captured automatically once the text is readable."
-                    },
+                    stringResource(when {
+                        capturingBack -> R.string.scan_instructions_back
+                        kind == "passport" -> R.string.scan_instructions_passport
+                        else -> R.string.scan_instructions_id_front
+                    }),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 if (cameraAllowed) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Switch(checked = autoCapture, onCheckedChange = { autoCapture = it; autoStatus = AutoCaptureStatus.SEARCHING })
-                        Text("  Auto capture", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.scan_auto_capture), Modifier.padding(start = 8.dp), style = MaterialTheme.typography.bodyMedium)
                     }
                     Box(Modifier.fillMaxWidth().aspectRatio(0.75f)) {
                         CameraPreview(Modifier.fillMaxSize(), analyzer = analyzer, imageCapture = capture)
                         if (autoCapture) AutoCaptureOverlay(autoStatus, target, capturing)
                     }
                 } else {
-                    Text("Camera permission not granted — you can still upload images.",
+                    Text(stringResource(R.string.scan_camera_permission_not_granted),
                         style = MaterialTheme.typography.bodySmall)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -377,12 +376,12 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
                         Button(onClick = { takePicture() }, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Filled.PhotoCamera, null)
                             Text(
-                                when {
-                                    capturing -> " Capturing…"
-                                    capturingBack -> " Capture back"
-                                    else -> " Capture"
-                                },
-                                maxLines = 1,
+                                stringResource(when {
+                                    capturing -> R.string.scan_capturing
+                                    capturingBack -> R.string.scan_capture_back
+                                    else -> R.string.scan_capture
+                                }),
+                                Modifier.padding(start = 4.dp), maxLines = 1,
                             )
                         }
                     }
@@ -396,32 +395,34 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
                         modifier = Modifier.weight(1f),
                     ) {
                         Icon(Icons.Filled.Image, null)
-                        Text(if (capturingBack) " Image (back)" else " Upload image", maxLines = 1)
+                        Text(stringResource(if (capturingBack) R.string.scan_upload_image_back else R.string.scan_upload_image),
+                            Modifier.padding(start = 4.dp), maxLines = 1)
                     }
                     OutlinedButton(
                         onClick = { error = null; pdfPicker.launch(arrayOf("application/pdf")) },
                         modifier = Modifier.weight(1f),
                     ) {
                         Icon(Icons.Filled.PictureAsPdf, null)
-                        Text(if (capturingBack) " PDF (back)" else " Upload PDF", maxLines = 1)
+                        Text(stringResource(if (capturingBack) R.string.scan_upload_pdf_back else R.string.scan_upload_pdf),
+                            Modifier.padding(start = 4.dp), maxLines = 1)
                     }
                 }
                 if (needBack && !capturingBack) {
-                    Text("ID card PDF: page 1 = front, page 2 = back (a single page with both sides also works).",
+                    Text(stringResource(R.string.scan_id_card_pdf_hint),
                         style = MaterialTheme.typography.bodySmall)
                 }
                 if (loading) CircularProgressIndicator()
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                front?.let { Thumb(it, "Front") }
-                back?.let { Thumb(it, "Back") }
-                if (combinedSides) Text("Front + back on one page", style = MaterialTheme.typography.labelSmall)
+                front?.let { Thumb(it, stringResource(R.string.scan_front_label)) }
+                back?.let { Thumb(it, stringResource(R.string.scan_back_label)) }
+                if (combinedSides) Text(stringResource(R.string.scan_front_back_one_page), style = MaterialTheme.typography.labelSmall)
             }
             if (front != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { front = null; back = null; uploaded = false; combinedSides = false; error = null; vm.resetIssuance() }) { Text("Start over") }
-                    Button(onClick = { vm.prepareImages(front!!, back, kind, uploaded) }, enabled = ready) { Text("Continue") }
+                    OutlinedButton(onClick = { front = null; back = null; uploaded = false; combinedSides = false; error = null; vm.resetIssuance() }) { Text(stringResource(R.string.scan_start_over)) }
+                    Button(onClick = { vm.prepareImages(front!!, back, kind, uploaded) }, enabled = ready) { Text(stringResource(R.string.scan_continue)) }
                 }
             }
         }
@@ -430,14 +431,15 @@ fun DocumentScanScreen(vm: MainViewModel, onDone: () -> Unit, onBack: () -> Unit
 
 @Composable
 private fun AutoCaptureOverlay(status: AutoCaptureStatus, target: CaptureTarget, capturing: Boolean) {
-    val (color, message) = when {
-        capturing || status == AutoCaptureStatus.CAPTURE -> Color(0xFF2E7D32) to "Captured"
-        status == AutoCaptureStatus.HOLD_STILL -> Color(0xFFF9A825) to "Hold still…"
-        status == AutoCaptureStatus.TOO_FAR -> Color.White to "Move closer — fill the frame"
-        status == AutoCaptureStatus.WRONG_SIDE -> Color(0xFFC62828) to "This is the back — show the FRONT first"
-        target == CaptureTarget.MRZ_PAGE -> Color.White to "Looking for the MRZ (<<< lines)…"
-        else -> Color.White to "Looking for the card front…"
+    val (color, messageRes) = when {
+        capturing || status == AutoCaptureStatus.CAPTURE -> Color(0xFF2E7D32) to R.string.autocapture_captured
+        status == AutoCaptureStatus.HOLD_STILL -> Color(0xFFF9A825) to R.string.autocapture_hold_still
+        status == AutoCaptureStatus.TOO_FAR -> Color.White to R.string.autocapture_move_closer
+        status == AutoCaptureStatus.WRONG_SIDE -> Color(0xFFC62828) to R.string.autocapture_wrong_side
+        target == CaptureTarget.MRZ_PAGE -> Color.White to R.string.autocapture_looking_mrz
+        else -> Color.White to R.string.autocapture_looking_card
     }
+    val message = stringResource(messageRes)
     Box(Modifier.fillMaxSize().padding(20.dp)) {
         // Guide frame: ID-1 / passport page proportions in landscape within the portrait preview
         Canvas(Modifier.fillMaxWidth().aspectRatio(1.42f).align(Alignment.Center)) {
@@ -477,7 +479,7 @@ private fun Thumb(jpeg: ByteArray, label: String) {
 @Composable
 fun ResultScreen(vm: MainViewModel, onFinish: () -> Unit, onOffer: (String) -> Unit, onRetry: () -> Unit) {
     val state by vm.issuance.collectAsState()
-    Scaffold(topBar = { SimpleTopBar("Your PID") }) { padding ->
+    Scaffold(topBar = { SimpleTopBar(stringResource(R.string.result_your_pid_title)) }) { padding ->
         Column(Modifier.padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             when (val s = state) {
@@ -485,21 +487,21 @@ fun ResultScreen(vm: MainViewModel, onFinish: () -> Unit, onOffer: (String) -> U
                     Spacer(Modifier.height(64.dp))
                     CircularProgressIndicator(Modifier.size(56.dp))
                     Text(s.message, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-                    Text("This can take up to a minute when the issuer has been idle.", style = MaterialTheme.typography.bodySmall,
+                    Text(stringResource(R.string.result_may_take_a_minute), style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center)
                 }
                 is IssuanceState.Failed -> {
                     Spacer(Modifier.height(48.dp))
                     Icon(Icons.Filled.Error, null, Modifier.size(64.dp), tint = MaterialTheme.colorScheme.error)
-                    Text("Something went wrong", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.result_something_went_wrong), style = MaterialTheme.typography.titleLarge)
                     Text(s.message, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
-                    Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("Try again") }
-                    OutlinedButton(onClick = onFinish, modifier = Modifier.fillMaxWidth()) { Text("Back to wallet") }
+                    Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.action_try_again)) }
+                    OutlinedButton(onClick = onFinish, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.result_back_to_wallet)) }
                 }
                 is IssuanceState.Finished -> FinishedResult(s, onFinish, onOffer)
                 else -> {
-                    Text("No result")
-                    Button(onClick = onFinish) { Text("Back to wallet") }
+                    Text(stringResource(R.string.result_no_result))
+                    Button(onClick = onFinish) { Text(stringResource(R.string.result_back_to_wallet)) }
                 }
             }
         }
@@ -512,27 +514,27 @@ private fun FinishedResult(s: IssuanceState.Finished, onFinish: () -> Unit, onOf
     val doc = s.outcome.document
     if (doc != null) {
         Icon(Icons.Filled.CheckCircle, null, Modifier.size(56.dp), tint = Color(0xFF2E7D32))
-        Text("Your PID is in your wallet", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
+        Text(stringResource(R.string.result_pid_in_wallet), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center)
         DocumentCard(doc) {}
         resp.attestation_offer?.takeIf { it.credentials.isNotEmpty() }?.let { offer ->
             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Also available from the same check", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.result_also_available), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     offer.credentials.forEach { Text("• ${it.name}") }
-                    Button(onClick = { onOffer(offer.uri) }, modifier = Modifier.fillMaxWidth()) { Text("Add attestations") }
+                    Button(onClick = { onOffer(offer.uri) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.result_add_attestations)) }
                 }
             }
         }
     } else {
         Icon(Icons.Filled.Error, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.error)
-        Text("PID not issued", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.result_pid_not_issued), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         resp.reasons.forEach { Text("• $it", color = MaterialTheme.colorScheme.error) }
     }
-    resp.score?.let { Text("Document score ${"%.2f".format(it)}", style = MaterialTheme.typography.bodySmall) }
+    resp.score?.let { Text(stringResource(R.string.result_document_score, "%.2f".format(it)), style = MaterialTheme.typography.bodySmall) }
     s.notes.forEach { Text("ℹ $it", style = MaterialTheme.typography.bodySmall) }
-    Text("Verification report", style = MaterialTheme.typography.titleSmall, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+    Text(stringResource(R.string.result_verification_report), style = MaterialTheme.typography.titleSmall, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
     ReportView(resp.report)
-    Button(onClick = onFinish, modifier = Modifier.fillMaxWidth()) { Text("Back to wallet") }
+    Button(onClick = onFinish, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.result_back_to_wallet)) }
 }
