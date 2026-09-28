@@ -1,9 +1,10 @@
 <resources>
     <!-- Window theme shown before Compose draws (launch); colours come from the active product
-         flavor's res/values/colors.xml (app/src/ingroupe or app/src/anipBenin). -->
-    <style name="Theme.GetYourIdWallet" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:colorPrimary">@color/brand_primary</item>
-        <item name="android:colorAccent">@color/brand_accent</item>
+         flavor's res/values/colors.xml (app/src/ingroupe or app/src/anipBenin).
+         Must descend from Theme.AppCompat: MainActivity is an AppCompatActivity. -->
+    <style name="Theme.GetYourIdWallet" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorPrimary">@color/brand_primary</item>
+        <item name="colorAccent">@color/brand_accent</item>
         <item name="android:windowBackground">@color/brand_surface</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
