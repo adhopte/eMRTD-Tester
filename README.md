@@ -1,4 +1,4 @@
-# getYourID Wallet by IN Groupe: eMRTD → EU PID
+# getYourID Wallet by Blue Tiger ID: eMRTD → EU PID
 
 An Android wallet app plus a backend that turns a passport or ID card into an **EU Person Identification Data (PID)** credential in **ISO/IEC 18013-5 mdoc** format (`eu.europa.ec.eudi.pid.1`). The PID is signed by a dummy "citizen PKI" issuer. You can present it to EU wallet **web verifiers** (OpenID4VP) and to **proximity verifiers** (ISO 18013-5 over QR/NFC engagement and BLE).
 
@@ -11,7 +11,7 @@ You can onboard in one of two ways:
 | **MRZ scan → NFC chip read** | ICAO eMRTDs (e-passports, eID cards) | Passive Authentication, Active Authentication, Chip Authentication, all checked by the server | high |
 | **Document image scan** | documents without a chip, or with an unreadable chip | image quality, format/geometry, photocopy and screen-recapture heuristics, portrait presence, MRZ check digits, VIZ↔MRZ consistency, expiry, specimen marks | low (heuristic) |
 
-> ⚠️ **Test system.** The issuer PKI ("IN Groupe Issuer IACA (TEST)") is a test PKI whose private keys are published in this repo, so it must not be trusted outside testing. The image-based authenticity checks are heuristics, not forensic document verification. Don't use either for real identity assurance without the hardening described below.
+> ⚠️ **Test system.** The issuer PKI ("Blue Tiger Issuer IACA (TEST)") is a test PKI whose private keys are published in this repo, so it must not be trusted outside testing. The image-based authenticity checks are heuristics, not forensic document verification. Don't use either for real identity assurance without the hardening described below.
 
 ```
 ┌──────────────── Android app (Kotlin / Compose) ───────────────┐          ┌────────────── Backend (Python / FastAPI) ──────────────┐
@@ -225,8 +225,8 @@ The app builds as two **product flavors** from the same source tree (`app/build.
 
 | Flavor | Application ID | App name | Colors |
 |---|---|---|---|
-| `ingroupe` (default) | `io.github.adhopte.emrtdwallet` | getYourID Wallet | IN Groupe blue/sky-blue |
-| `anipBenin` | `io.github.adhopte.emrtdwallet.anip` | Bénin IN Groupe POC | Bénin flag green/gold/red |
+| `ingroupe` (default) | `io.github.adhopte.emrtdwallet` | getYourID Wallet | Blue Tiger blue/sky-blue |
+| `anipBenin` | `io.github.adhopte.emrtdwallet.anip` | Bénin Blue Tiger POC | Bénin flag green/gold/red |
 
 Each flavor supplies its own `Brand.kt` palette object, launcher icon, emblem drawable and brand strings (`app_name`, `brand_tagline`, `issuer_display_name`, …) under `app/src/<flavor>/`; everything else is shared. Build a specific flavor with:
 
